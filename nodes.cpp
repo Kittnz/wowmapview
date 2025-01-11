@@ -86,6 +86,11 @@ void WorldBotNodes::LoadFromDB()
             link.maxCreature[1] = fields[9].GetUInt8();
             link.maxCreature[2] = fields[10].GetUInt8();
             links.push_back(link);
+
+            auto& node = std::find_if(nodes.begin(), nodes.end(),
+                [&](const TravelNode& n) { return n.id == link.fromNodeId; });
+            if(node != nodes.end())
+                node->links.push_back(&links.back());
         } while (result->NextRow());
     }
 
@@ -107,6 +112,12 @@ void WorldBotNodes::LoadFromDB()
             // Convert coordinates
             point.position = Vec3D(-(point.y - ZEROPOINT), point.z, -(point.x - ZEROPOINT));
             pathPoints.push_back(point);
+
+            auto& link = std::find_if(links.begin(), links.end(),
+                [&](const TravelNodeLink& n) { return n.fromNodeId == point.fromNodeId && n.toNodeId == point.toNodeId; });
+
+            if (link != links.end())
+                link->points.push_back(&pathPoints.back());
         } while (result->NextRow());
     }
 }
@@ -146,8 +157,8 @@ void WorldBotNodes::Draw(int mapId)
         glEnable(GL_DEPTH_TEST);
         glDepthMask(GL_FALSE);
 
-        DrawLinks(mapId);
-        //DrawPathPoints(mapId);
+        //DrawLinks(mapId);
+        DrawPathPoints(mapId);
 
         // Draw normal boxes instead
         for (const auto& node : nodes)
@@ -174,8 +185,8 @@ void WorldBotNodes::Draw(int mapId)
         glEnable(GL_DEPTH_TEST);
         glDepthMask(GL_FALSE);
 
-        DrawLinks(mapId);
-        //DrawPathPoints(mapId);
+        //DrawLinks(mapId);
+        DrawPathPoints(mapId);
 
         for (const auto& node : nodes)
         {
@@ -351,18 +362,58 @@ void WorldBotNodes::DrawPathPoints(int mapId)
 {
     Vec4D pathColor(1.0f, 1.0f, 0.0f, 0.7f);  // Yellow for path points
 
-    for (const auto& point : pathPoints)
+    TravelNodePathPoint lastPoint, curPoint;
+
+    glLineWidth(2.0f);  // Thicker lines for links
+    glColor4f(1.0f, 1.0f, 0.0f, 0.7f);  // Semi-transparent green
+
+    
+
+    for (const auto& node : nodes)
     {
-        if (point.mapId != mapId)
+        if (node.mapId != mapId)
             continue;
 
-        // Skip if too far from camera
-        float distanceToCamera = (point.position - gWorld->camera).length();
-        if (distanceToCamera > VIEW_DISTANCE)
+        float distanceToCamera = (node.position - gWorld->camera).length();
+        if (distanceToCamera > VIEW_DISTANCE * 10)
             continue;
 
-        DrawSphere(point.position, PATH_POINT_SIZE, pathColor);
+        for (const auto& link : node.links)
+        {
+            auto toNode = std::find_if(nodes.begin(), nodes.end(),
+                [&](const TravelNode& n) { return n.id == link->toNodeId; });
+
+            if (toNode->mapId != mapId)
+                continue;
+
+            float distanceToCamera = (toNode->position - gWorld->camera).length();
+            if (distanceToCamera > VIEW_DISTANCE * 10)
+                continue;
+
+            glBegin(GL_LINES);
+
+            for (auto& point : link->points)
+            {
+                if (point == link->points.front())
+                    continue;
+
+                // Skip if too far from camera
+                float distanceToCamera = (point->position - gWorld->camera).length();
+                if (distanceToCamera > VIEW_DISTANCE)
+                    continue;
+
+                auto& prevPoint = *(&point - 1);
+
+                //DrawSphere(point.position, PATH_POINT_SIZE, pathColor);
+                glVertex3fv(prevPoint->position);
+                glVertex3fv(point->position);
+            }
+            glEnd();
+        }
     }
+
+
+    glLineWidth(0.5f);
 }
 
 void WorldBotNodes::DrawNodeLabel(const TravelNode& node)

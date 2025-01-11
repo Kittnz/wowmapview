@@ -264,7 +264,7 @@ void Test::keypressed(SDL_KeyboardEvent *e)
 		if (e->keysym.sym == SDLK_g) {
 			static size_t currentNode = 0;
 			if (!world->botNodes.nodes.empty()) {
-				moveToNode(world->botNodes.nodes[currentNode]);
+				//moveToNode(world->botNodes.nodes[currentNode]);
 				currentNode = (currentNode + 1) % world->botNodes.nodes.size();
 			}
 		}

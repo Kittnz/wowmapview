@@ -11,17 +11,13 @@
 #include "defines/Common.h"
 #include "model.h"
 
-struct TravelNode {
-    uint32 id;
-    std::string name;
+struct TravelNodePathPoint {
+    uint32 fromNodeId;
+    uint32 toNodeId;
+    uint32 nr;
     uint32 mapId;
-    float x;
-    float y;
-    float z;
-    uint8 linked;
-
-    Vec3D position;
-    float radius;
+    float x, y, z;
+    Vec3D position; // Converted position
 };
 
 struct TravelNodeLink {
@@ -34,15 +30,21 @@ struct TravelNodeLink {
     float extraCost;
     bool calculated;
     uint8 maxCreature[3];
+    std::vector<TravelNodePathPoint*> points = {};
 };
 
-struct TravelNodePathPoint {
-    uint32 fromNodeId;
-    uint32 toNodeId;
-    uint32 nr;
+struct TravelNode {
+    uint32 id;
+    std::string name;
     uint32 mapId;
-    float x, y, z;
-    Vec3D position; // Converted position
+    float x;
+    float y;
+    float z;
+    uint8 linked;
+
+    Vec3D position;
+    float radius;
+    std::vector<TravelNodeLink*> links = {};
 };
 
 
@@ -61,9 +63,9 @@ public:
     void LoadFromDB();
     void Draw(int mapId);
 
-    std::vector<TravelNode> nodes;
-    std::vector<TravelNodeLink> links;
-    std::vector<TravelNodePathPoint> pathPoints;
+    std::list<TravelNode> nodes;
+    std::list<TravelNodeLink> links;
+    std::list<TravelNodePathPoint> pathPoints;
 
 private:
     GLuint sphereDisplayList;
