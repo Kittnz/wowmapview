@@ -7,7 +7,7 @@ World *gWorld=0;
 
 World::World(const char* name):basename(name)
 {
-	//::gWorld = this;
+	gWorld = this;
 
 	gLog("\nLoading world %s\n", name);
 
@@ -893,7 +893,6 @@ void World::draw()
 	}
 
 	botNodes.Draw(currentMapId);
-
 }
 
 
