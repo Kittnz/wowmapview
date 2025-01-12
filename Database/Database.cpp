@@ -173,8 +173,6 @@ void Database::WorkerThread()
             std::this_thread::sleep_for(std::chrono::milliseconds(1));
         }
     }
-
-    printf("Database::WorkerThread end.\n");
 }
 
 std::shared_ptr<QueryResult> Database::Query(const char* format, ...)

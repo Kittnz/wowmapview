@@ -385,7 +385,8 @@ void World::initDisplay()
 
 	initLowresTerrain();
 
-	botNodes.LoadFromDB();
+    botNodes.LoadNodeModel();
+    botNodes.LoadFromDB();
 
 }
 
@@ -891,6 +892,8 @@ void World::draw()
 			loading = true;
 		}
 	}
+
+	botNodes.Draw(currentMapId);
 
 	botNodes.Draw(currentMapId);
 }

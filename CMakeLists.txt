@@ -102,11 +102,23 @@ add_library(zlib SHARED ${zlibfiles} ${ZLIB_PUBLIC_HDRS} ${ZLIB_PRIVATE_HDRS})
 set_target_properties(zlib PROPERTIES DEFINE_SYMBOL ZLIB_DLL)
 set_target_properties(zlib PROPERTIES SOVERSION 1)
 
+set(bzipfiles
+        ${CMAKE_SOURCE_DIR}/bzip2/compress.c
+        ${CMAKE_SOURCE_DIR}/bzip2/crctable.c
+        ${CMAKE_SOURCE_DIR}/bzip2/decompress.c
+        ${CMAKE_SOURCE_DIR}/bzip2/huffman.c
+        ${CMAKE_SOURCE_DIR}/bzip2/randtable.c
+        ${CMAKE_SOURCE_DIR}/bzip2/blocksort.c
+        ${CMAKE_SOURCE_DIR}/bzip2/bzlib.c
+)
+
+add_library(bzip2 SHARED ${bzipfiles})
+
 # Configure libmpq
-file(GLOB mpqfiles libmpq/*.cpp libmpq/*.h)
+file(GLOB mpqfiles libmpq/*.c libmpq/*.h *.h)
 add_library(libmpq STATIC ${mpqfiles})
-target_include_directories(libmpq PRIVATE zlib)
-target_link_libraries(libmpq PRIVATE zlib)
+target_include_directories(libmpq PRIVATE zlib bzip2)
+target_link_libraries(libmpq PRIVATE zlib bzip2)
 
 # Main executable
 add_executable(wowmapview WIN32 ${SOURCES} ${HEADERS})
@@ -122,6 +134,7 @@ target_include_directories(wowmapview PRIVATE
     ${MYSQL_INCLUDE_DIR}
     ${CMAKE_SOURCE_DIR}
     zlib
+    bzip2
     libmpq
 )
 
@@ -133,11 +146,17 @@ target_link_libraries(wowmapview PRIVATE
     ${CMAKE_SOURCE_DIR}/SDL/lib/SDL.lib
     ${CMAKE_SOURCE_DIR}/SDL/lib/SDLmain.lib
     ${CMAKE_SOURCE_DIR}/MySQL/lib/libmysql.lib
-    libmpq
     zlib
+    bzip2
+    libmpq
     opengl32
     glu32
 )
+
+if(MSVC)
+    target_compile_options(libmpq PRIVATE /wd4103)
+    target_include_directories(libmpq PUBLIC ${CMAKE_SOURCE_DIR}/libmpq/win)
+endif()
 
 add_custom_command(
     TARGET ${PROJECT_NAME} POST_BUILD

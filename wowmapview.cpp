@@ -231,17 +231,15 @@ int main(int argc, char *argv[])
     {
         const char* archiveNames[] = {"texture.MPQ", "model.MPQ", "wmo.MPQ", "terrain.MPQ", "interface.MPQ", "misc.MPQ", "dbc.MPQ"};
 
-        if (usePatch) {
-            // patch goes first -> fake priority handling
-            sprintf(path, "%s%s", gamePath.c_str(), "patch.MPQ");
-            archives.push_back(new MPQArchive(path));
-            sprintf(path, "%s%s", gamePath.c_str(), "patch-5.MPQ");
+        for (auto & archiveName : archiveNames) {
+            sprintf(path, "%s%s", gamePath.c_str(), archiveName);
             archives.push_back(new MPQArchive(path));
         }
 
-        for (size_t i=0; i<7; i++) {
-            gLog("Trying to open mpq %s \n", archiveNames[i]);
-            sprintf(path, "%s%s", gamePath.c_str(), archiveNames[i]);
+        if (usePatch) {
+            sprintf(path, "%s%s", gamePath.c_str(), "patch.MPQ");
+            archives.push_back(new MPQArchive(path));
+            sprintf(path, "%s%s", gamePath.c_str(), "patch-2.MPQ");
             archives.push_back(new MPQArchive(path));
         }
     }

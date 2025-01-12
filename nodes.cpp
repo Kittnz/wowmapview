@@ -23,7 +23,7 @@ const float WorldBotNodes::VIEW_DISTANCE = 300.0f;  // Draw nodes within 1000 un
 
 WorldBotNodes::WorldBotNodes() : nodeModel(nullptr)
 {
-    LoadNodeModel();
+
 }
 
 WorldBotNodes::~WorldBotNodes()

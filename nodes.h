@@ -59,6 +59,7 @@ public:
     static const float VIEW_DISTANCE;
 
     void LoadFromDB();
+    bool LoadNodeModel();
     void Draw(int mapId);
 
     std::vector<TravelNode> nodes;
@@ -76,9 +77,8 @@ private:
     bool WorldToScreen(const Vec3D& worldPos, Vec2D& screenPos, bool& isVisible);
 
     Model* nodeModel;
-    int nodeModelId;
+    int nodeModelId = 0;
     std::string modelName;
-    bool LoadNodeModel();
     void DrawModel(const Vec3D& pos, const Vec4D& color);
 };
 
