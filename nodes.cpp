@@ -62,7 +62,7 @@ void WorldBotNodes::LoadFromDB()
             if (node.mapId != gWorld->currentMapId)
                 continue;
 
-            gLog("Loaded travel node %u: %s (%.2f, %.2f, %.2f) on map %u\n", node.id, node.name.c_str(), node.x, node.y, node.z, node.mapId);
+            //gLog("Loaded travel node %u: %s (%.2f, %.2f, %.2f) on map %u\n", node.id, node.name.c_str(), node.x, node.y, node.z, node.mapId);
 
             // Convert WoW coordinates to OpenGL coordinates
             node.position = Vec3D(-(node.y - ZEROPOINT), (node.z), -(node.x - ZEROPOINT));

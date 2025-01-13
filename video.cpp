@@ -133,7 +133,7 @@ bool isExtensionSupported(const char* search)
 	}
 
 	// Log all available extensions for debugging
-	gLog("Available OpenGL extensions:\n%s\n", extensions);
+	//gLog("Available OpenGL extensions:\n%s\n", extensions);
 
 	const char* start, * where, * terminator;
 
