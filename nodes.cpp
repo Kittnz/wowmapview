@@ -3,6 +3,7 @@
 #include "world.h"
 #include "model.h"
 #include "Database/Database.h"
+#include "Objects/WorldObject.h"
 #include <cmath>
 #include <algorithm>
 #include <SDL.h>
@@ -64,8 +65,10 @@ void WorldBotNodes::LoadFromDB()
 
             //gLog("Loaded travel node %u: %s (%.2f, %.2f, %.2f) on map %u\n", node.id, node.name.c_str(), node.x, node.y, node.z, node.mapId);
 
-            // Convert WoW coordinates to OpenGL coordinates
-            node.position = Vec3D(-(node.y - ZEROPOINT), (node.z), -(node.x - ZEROPOINT));
+            Position nodePos(node.x, node.y, node.z, 0.0f);
+            Position viewerPos = WorldObject::ConvertGameCoordsToViewerCoords(nodePos);
+
+            node.position = Vec3D(viewerPos.x, viewerPos.y, viewerPos.z);
             node.radius = 2.0f;
 
             nodes.push_back(node);
