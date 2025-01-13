@@ -2,7 +2,7 @@
 #include "wowmapview.h"
 #include "areadb.h"
 #include "shaders.h"
-
+#include "Objects/WorldObject.h"
 #include <cmath>
 #include <string>
 
@@ -170,9 +170,14 @@ void Test::display(float t, float dt)
 			//f16->print(5, 60, "%02d:%02d", hh,mm);
 			f16->print(video.xres - 50, 0, "%02d:%02d", hh,mm);
 
-			// Show the raw camera coordinates								
+			// Show the raw camera coordinates
 			f16->print(5, video.yres - 42, "Camera: (%.0f, %.0f, %.0f)", world->camera.x, world->camera.y, world->camera.z);
-			f16->print(5, video.yres - 22, "XYZ: (%.0f, %.0f, %.0f)", -(world->camera.z - ZEROPOINT), -(world->camera.x - ZEROPOINT), (world->camera.y));
+
+			// Convert camera position to xyz coordinates using WorldObject's conversion method
+			Position cameraPos(world->camera.x, world->camera.y, world->camera.z, 0.0f);
+			Position xyzPos = WorldObject::ConvertViewerCoordsToGameCoords(cameraPos);
+
+			f16->print(5, video.yres - 22, "XYZ: (%.0f, %.0f, %.0f)", xyzPos.x, xyzPos.y, xyzPos.z);
 		}
 
 		if (world->loading) {
@@ -219,15 +224,18 @@ void Test::moveToNearestNode()
 
 void Test::moveToNode(const TravelNode& node)
 {
+	// Convert node position to viewer coordinates using WorldObject's conversion method
+	Position nodePos(node.x, node.y, node.z, 0.0f);
+	Position viewerPos = WorldObject::ConvertGameCoordsToViewerCoords(nodePos);
+
 	// Move camera to slightly above node position
-	world->camera = Vec3D(-(node.y - ZEROPOINT), (node.z), -(node.x - ZEROPOINT));
+	world->camera = Vec3D(viewerPos.x, viewerPos.y, viewerPos.z);
 
 	// Update look target to look forward
 	Vec3D lookDir = Vec3D(cosf(10.0f * PI / 180.0f), 10.0f, sinf(10.0f * PI / 180.0f));
 	world->lookat = world->camera + lookDir;
 
 	tick(0, 0.001f);
-
 	gLog("Moved to node: %s\n", node.name.c_str());
 }
 

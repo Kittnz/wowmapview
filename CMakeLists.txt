@@ -35,6 +35,7 @@ set(SOURCES
     database/QueryObject.cpp
     database/QueryResult.cpp
     nodes.cpp
+    objects/WorldObject.cpp
 )
 
 set(HEADERS
@@ -72,6 +73,7 @@ set(HEADERS
     defines/Common.h
     defines/DBCFile.h
     nodes.h
+    objects/WorldObject.h
 )
 
 # Platform-specific settings
