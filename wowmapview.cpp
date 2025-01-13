@@ -17,6 +17,7 @@
 #include <ctime>
 #include <cstdlib>
 #include <algorithm>
+#include <filesystem>
 
 #include "mpq.h"
 #include "video.h"
@@ -236,11 +237,26 @@ int main(int argc, char *argv[])
             archives.push_back(new MPQArchive(path));
         }
 
-        if (usePatch) {
+        if (usePatch)
+        {
+            auto dirIter = std::filesystem::directory_iterator(gamePath.c_str());
+            // load patch first
             sprintf(path, "%s%s", gamePath.c_str(), "patch.MPQ");
             archives.push_back(new MPQArchive(path));
-            sprintf(path, "%s%s", gamePath.c_str(), "patch-2.MPQ");
-            archives.push_back(new MPQArchive(path));
+            for (auto& fl : dirIter)
+            {
+                if (fl.is_regular_file())
+                {
+                    const std::filesystem::path &p(fl.path());
+                    if (p.extension().string() != ".mpq" && p.extension().string() != ".MPQ")
+                        continue;
+                    auto fileName = p.stem().string();
+                    if (fileName.find("patch-") == std::string::npos)
+                        continue;
+
+                    archives.push_back(new MPQArchive(p.string().c_str()));
+                }
+            }
         }
     }
 
