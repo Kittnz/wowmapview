@@ -67,10 +67,24 @@ public:
     std::vector<TravelNodePathPoint> pathPoints;
 
 private:
+
+    struct LinkVertexData {
+        Vec3D start;
+        Vec3D end;
+    };
+
     GLuint sphereDisplayList;
+    GLuint linkVBO;
+
+    std::vector<LinkVertexData> linkVertices;
+    bool linksNeedUpdate;
 
     void DrawBox(const Vec3D& pos, float size, const Vec4D& color);
+
+    void InitVBO();
+    void UpdateLinkVBO();
     void DrawLinks(int mapId);
+
     void DrawPathPoints(int mapId);
     void DrawSphere(const Vec3D& pos, float radius, const Vec4D& color);
     void DrawNodeLabel(const TravelNode& node);

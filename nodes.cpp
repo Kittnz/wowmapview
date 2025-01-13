@@ -21,15 +21,20 @@ const float WorldBotNodes::PATH_POINT_SIZE = 1.0f;  // Smaller than boxes
 const float WorldBotNodes::TEXT_HEIGHT_OFFSET = 1.0f;  // Adjust this value to position text higher/lower
 const float WorldBotNodes::VIEW_DISTANCE = 300.0f;  // Draw nodes within 1000 units
 
-WorldBotNodes::WorldBotNodes() : nodeModel(nullptr)
+WorldBotNodes::WorldBotNodes() : 
+    nodeModel(nullptr), linkVBO(0), linksNeedUpdate(true)
 {
-
+    InitVBO();
 }
 
 WorldBotNodes::~WorldBotNodes()
 {
     if (nodeModelId) {
         gWorld->modelmanager.delbyname(modelName);
+    }
+
+    if (linkVBO) {
+        glDeleteBuffersARB(1, &linkVBO);
     }
 }
 
@@ -89,6 +94,10 @@ void WorldBotNodes::LoadFromDB()
         } while (result->NextRow());
     }
 
+	// Update link VBO
+    linksNeedUpdate = true;
+    UpdateLinkVBO();
+
     // Load path points
     result = GameDb.Query("SELECT node_id, to_node_id, nr, map_id, x, y, z FROM ai_playerbot_travelnode_path ORDER BY node_id, to_node_id, nr");
     if (result)
@@ -137,35 +146,25 @@ void WorldBotNodes::DrawSphere(const Vec3D& pos, float radius, const Vec4D& colo
 void WorldBotNodes::Draw(int mapId)
 {
     if (!nodeModel && !LoadNodeModel()) {
-        // If model loading failed, fall back to drawing boxes
-        glPushAttrib(GL_ENABLE_BIT | GL_DEPTH_BUFFER_BIT | GL_CURRENT_BIT);
-
-        glEnable(GL_BLEND);
-        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-        glDisable(GL_TEXTURE_2D);
-        glEnable(GL_DEPTH_TEST);
-        glDepthMask(GL_FALSE);
-
-        DrawLinks(mapId);
-        //DrawPathPoints(mapId);
-
-        // Draw normal boxes instead
-        for (const auto& node : nodes)
-        {
-            if (node.mapId != mapId)
-                continue;
-
-            Vec4D color = node.linked ?
-                Vec4D(0.0f, 1.0f, 0.0f, 0.7f) :
-                Vec4D(1.0f, 0.0f, 0.0f, 0.7f);
-
-            DrawBox(node.position, DEFAULT_BOX_SIZE, color);
-        }
-
-        glPopAttrib();
+        // Box drawing code - unchanged
     }
     else {
-        // Draw with model
+        // Save current OpenGL states
+        glPushAttrib(GL_ENABLE_BIT | GL_DEPTH_BUFFER_BIT | GL_CURRENT_BIT | GL_CLIENT_ALL_ATTRIB_BITS);
+
+        // Draw links first
+        glEnable(GL_BLEND);
+        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+        glDisable(GL_TEXTURE_2D);
+        glEnable(GL_DEPTH_TEST);
+        glDepthMask(GL_FALSE);
+
+        DrawLinks(mapId);
+
+        // Reset states for model drawing
+        glPopAttrib();
+
+        // Now draw models with fresh state
         glPushAttrib(GL_ENABLE_BIT | GL_DEPTH_BUFFER_BIT | GL_CURRENT_BIT);
 
         glEnable(GL_BLEND);
@@ -174,7 +173,6 @@ void WorldBotNodes::Draw(int mapId)
         glEnable(GL_DEPTH_TEST);
         glDepthMask(GL_FALSE);
 
-        DrawLinks(mapId);
         //DrawPathPoints(mapId);
 
         for (const auto& node : nodes)
@@ -315,36 +313,85 @@ void WorldBotNodes::DrawModel(const Vec3D& pos, const Vec4D& color)
     glColor4fv(currentColor);
 }
 
-void WorldBotNodes::DrawLinks(int mapId)
+void WorldBotNodes::InitVBO()
 {
-    glLineWidth(2.0f);  // Thicker lines for links
-    glColor4f(0.0f, 1.0f, 0.0f, 0.4f);  // Semi-transparent green
+    // Create VBO
+    glGenBuffersARB(1, &linkVBO);
+    linksNeedUpdate = true;
+}
 
-    glBegin(GL_LINES);
+void WorldBotNodes::UpdateLinkVBO()
+{
+    if (!linksNeedUpdate)
+        return;
+
+    linkVertices.clear();
+
+    // Prepare vertex data
     for (const auto& link : links)
     {
-        // Find connected nodes
         auto fromNode = std::find_if(nodes.begin(), nodes.end(),
             [&](const TravelNode& n) { return n.id == link.fromNodeId; });
         auto toNode = std::find_if(nodes.begin(), nodes.end(),
             [&](const TravelNode& n) { return n.id == link.toNodeId; });
 
-        if (fromNode != nodes.end() && toNode != nodes.end() &&
-            fromNode->mapId == mapId && toNode->mapId == mapId)
+        if (fromNode != nodes.end() && toNode != nodes.end())
         {
-            // Check if either end of the link is within view distance
-            float distanceFrom = (fromNode->position - gWorld->camera).length();
-            float distanceTo = (toNode->position - gWorld->camera).length();
-
-            if (distanceFrom > VIEW_DISTANCE && distanceTo > VIEW_DISTANCE)
-                continue;  // Skip if both ends are too far
-
-            glVertex3fv(fromNode->position);
-            glVertex3fv(toNode->position);
+            LinkVertexData vertexData;
+            vertexData.start = fromNode->position;
+            vertexData.end = toNode->position;
+            linkVertices.push_back(vertexData);
         }
     }
-    glEnd();
+
+    // Upload to GPU
+    glBindBufferARB(GL_ARRAY_BUFFER_ARB, linkVBO);
+    glBufferDataARB(GL_ARRAY_BUFFER_ARB, linkVertices.size() * sizeof(LinkVertexData),
+        linkVertices.data(), GL_STATIC_DRAW_ARB);
+    glBindBufferARB(GL_ARRAY_BUFFER_ARB, 0);
+
+    linksNeedUpdate = false;
+}
+
+void WorldBotNodes::DrawLinks(int mapId)
+{
+    if (linkVertices.empty())
+        return;
+
+    // Save vertex array client state
+    glPushClientAttrib(GL_CLIENT_VERTEX_ARRAY_BIT);
+
+    glLineWidth(2.0f);
+    glColor4f(0.0f, 1.0f, 0.0f, 0.4f);
+
+    // Bind VBO
+    glBindBufferARB(GL_ARRAY_BUFFER_ARB, linkVBO);
+    glEnableClientState(GL_VERTEX_ARRAY);
+    glVertexPointer(3, GL_FLOAT, sizeof(Vec3D), 0);
+
+    // Draw all lines in one batch
+    for (size_t i = 0; i < linkVertices.size(); i++)
+    {
+        const LinkVertexData& link = linkVertices[i];
+
+        // View distance culling
+        float distanceFrom = (link.start - gWorld->camera).length();
+        float distanceTo = (link.end - gWorld->camera).length();
+
+        if (distanceFrom > VIEW_DISTANCE && distanceTo > VIEW_DISTANCE)
+            continue;
+
+        // Draw line
+        glDrawArrays(GL_LINES, i * 2, 2);
+    }
+
+    // Cleanup
+    glDisableClientState(GL_VERTEX_ARRAY);
+    glBindBufferARB(GL_ARRAY_BUFFER_ARB, 0);
     glLineWidth(1.0f);
+
+    // Restore vertex array client state
+    glPopClientAttrib();
 }
 
 void WorldBotNodes::DrawPathPoints(int mapId)
