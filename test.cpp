@@ -173,25 +173,6 @@ void Test::display(float t, float dt)
 			// Show the raw camera coordinates								
 			f16->print(5, video.yres - 42, "Camera: (%.0f, %.0f, %.0f)", world->camera.x, world->camera.y, world->camera.z);
 			f16->print(5, video.yres - 22, "XYZ: (%.0f, %.0f, %.0f)", -(world->camera.z - ZEROPOINT), -(world->camera.x - ZEROPOINT), (world->camera.y));
-
-            f24->shprint(video.xres - 170, 30, "Controls");
-            f16->shprint(video.xres - 240, 66, "F1 - toggle models\n"
-                                  "F2 - toggle doodads\n"
-                                  "F3 - toggle terrain\n"
-                                  "F4 - toggle UI\n"
-                                  "F5 - save bookmark\n"
-                                  "F6 - toggle map objects\n"
-                                  "H - disable highres terrain\n"
-                                  "I - toggle invert mouse\n"
-                                  "M - minimap\n"
-                                  "Esc - back/exit\n"
-                                  "WASD - move\n"
-                                  "R - quick 180 degree turn\n"
-                                  "F - toggle fog\n"
-                                  "+,- - adjust fog distance\n"
-                                  "O,P - slower/faster movement\n"
-                                  "B,N - slower/faster time\n"
-            );
 		}
 
 		if (world->loading) {
