@@ -329,7 +329,8 @@ int main(int argc, char *argv[])
             float fps = (float)fcount / (float)ft * 1000.0f;
             gFPS = fps;
             char buf[32];
-            sprintf(buf, APP_TITLE " - %.2f fps",fps);
+            //sprintf(buf, APP_TITLE " - %.2f fps",fps);
+            sprintf(buf, APP_TITLE);
             SDL_WM_SetCaption(buf,NULL);
             ft = 0;
             fcount = 0;
