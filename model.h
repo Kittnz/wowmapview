@@ -126,16 +126,13 @@ class Model: public ManagedItem {
 	GLuint dlist;
 	GLuint vbuf, nbuf, tbuf;
 	size_t vbufsize;
-	bool animated;
 	bool animGeometry,animTextures,animBones;
 
 	bool forceAnim;
 
 	void init(MPQFile &f);
 
-	ModelHeader header;
 	TextureAnim *texanims;
-	ModelAnimation *anims;
 	int *globalSequences;
 	ModelColor *colors;
 	ModelTransparency *transparency;
@@ -155,13 +152,18 @@ class Model: public ManagedItem {
 	size_t nIndices;
 	std::vector<ModelRenderPass> passes;
 
-	void animate(int anim);
 	void calcBones(int anim, int time);
 
 	void lightsOn(GLuint lbase);
 	void lightsOff(GLuint lbase);
 
 public:
+	bool animated;
+	ModelHeader header;
+	ModelAnimation* anims;
+
+	void animate(int anim);
+
 	ModelCamera cam;
 	Bone *bones;
 	TextureID *textures;

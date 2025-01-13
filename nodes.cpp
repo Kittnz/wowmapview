@@ -1,6 +1,7 @@
 #include "nodes.h"
 #include "wowmapview.h"
 #include "world.h"
+#include "model.h"
 #include "Database/Database.h"
 #include <cmath>
 #include <algorithm>
@@ -145,50 +146,45 @@ void WorldBotNodes::DrawSphere(const Vec3D& pos, float radius, const Vec4D& colo
 
 void WorldBotNodes::Draw(int mapId)
 {
-    if (!nodeModel && !LoadNodeModel()) {
-        // Box drawing code - unchanged
+    // Save current OpenGL states
+    glPushAttrib(GL_ENABLE_BIT | GL_DEPTH_BUFFER_BIT | GL_CURRENT_BIT | GL_CLIENT_ALL_ATTRIB_BITS);
+
+    // Draw links first
+    glEnable(GL_BLEND);
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+    glDisable(GL_TEXTURE_2D);
+    glEnable(GL_DEPTH_TEST);
+    glDepthMask(GL_FALSE);
+
+    DrawLinks(mapId);
+
+    // Reset states for model drawing
+    glPopAttrib();
+
+    // Now draw models with fresh state
+    glPushAttrib(GL_ENABLE_BIT | GL_DEPTH_BUFFER_BIT | GL_CURRENT_BIT);
+
+    glEnable(GL_BLEND);
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+    glDisable(GL_TEXTURE_2D);
+    glEnable(GL_DEPTH_TEST);
+    glDepthMask(GL_FALSE);
+
+    //DrawPathPoints(mapId);
+
+    for (const auto& node : nodes)
+    {
+        if (node.mapId != mapId)
+            continue;
+
+        Vec4D color = node.linked ?
+            Vec4D(0.0f, 1.0f, 0.0f, 0.7f) :
+            Vec4D(1.0f, 0.0f, 0.0f, 0.7f);
+
+        DrawModel(node.position, color);
     }
-    else {
-        // Save current OpenGL states
-        glPushAttrib(GL_ENABLE_BIT | GL_DEPTH_BUFFER_BIT | GL_CURRENT_BIT | GL_CLIENT_ALL_ATTRIB_BITS);
 
-        // Draw links first
-        glEnable(GL_BLEND);
-        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-        glDisable(GL_TEXTURE_2D);
-        glEnable(GL_DEPTH_TEST);
-        glDepthMask(GL_FALSE);
-
-        DrawLinks(mapId);
-
-        // Reset states for model drawing
-        glPopAttrib();
-
-        // Now draw models with fresh state
-        glPushAttrib(GL_ENABLE_BIT | GL_DEPTH_BUFFER_BIT | GL_CURRENT_BIT);
-
-        glEnable(GL_BLEND);
-        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-        glDisable(GL_TEXTURE_2D);
-        glEnable(GL_DEPTH_TEST);
-        glDepthMask(GL_FALSE);
-
-        //DrawPathPoints(mapId);
-
-        for (const auto& node : nodes)
-        {
-            if (node.mapId != mapId)
-                continue;
-
-            Vec4D color = node.linked ?
-                Vec4D(0.0f, 1.0f, 0.0f, 0.7f) :
-                Vec4D(1.0f, 0.0f, 0.0f, 0.7f);
-
-            DrawModel(node.position, color);
-        }
-
-        glPopAttrib();
-    }
+    glPopAttrib();
 
     // Draw labels last
     for (const auto& node : nodes)
@@ -260,28 +256,54 @@ bool WorldBotNodes::LoadNodeModel()
         return false;
     }
 
-    modelName = "Creature\\KelThuzad\\KelThuzad.m2";
+    // Start with models we know work well
+    const char* modelPaths[] = {
+        "CREATURE\\WISP\\WISP.M2",
+        //"CREATURE\\CHICKEN\\CHICKEN.M2",
+        "CREATURE\\MURLOC\\MURLOC.M2",
+        /*"CREATURE\\RAT\\RAT.M2",
+        "CREATURE\\RABBIT\\RABBIT.M2",
+		"CREATURE\\SQUIRREL\\SQUIRREL.M2",
+		"CREATURE\\CRAB\\CRAB.M2",*/
+        "CREATURE\\KELTHUZAD\\KELTHUZAD.M2"
+    };
 
-    // Force animated flag for character models
-    nodeModel = new Model(modelName, true);
+    // Randomly select a model
+    int modelIndex = randint(0, sizeof(modelPaths) / sizeof(modelPaths[0]) - 1);
+    modelName = modelPaths[modelIndex];
 
-    nodeModelId = gWorld->modelmanager.add(modelName);
-    if (nodeModelId) {
-        nodeModel = (Model*)gWorld->modelmanager.items[nodeModelId];
-        if (nodeModel && nodeModel->ok) {
-            // Debug texture info
-            if (nodeModel->HasTextures()) {
-                for (size_t i = 0; i < nodeModel->GetTextureCount(); i++) {
-                    gLog("Model texture %d: %d\n", i, nodeModel->GetTexture(i));
-                }
-            }
-            else {
-                gLog("Model has no textures\n");
-            }
-            return true;
+    // Convert to lowercase for WoW path format
+    std::string altPath = modelName;
+    std::transform(altPath.begin(), altPath.end(), altPath.begin(), ::tolower);
+
+    // Load model
+    nodeModel = new Model(altPath, true);
+
+    if (nodeModel && nodeModel->ok) {
+        nodeModelId = gWorld->modelmanager.add(altPath);
+        gLog("Successfully loaded model: %s\n", altPath.c_str());
+
+        // Debug texture info
+        if (nodeModel->header.nTextures > 0) {
+            gLog("Model has %d textures\n", nodeModel->header.nTextures);
+            // Could add more texture debugging here
         }
+        else {
+            gLog("Model has no textures!\n");
+        }
+
+        return true;
     }
-    gLog("Failed to load node model: %s\n", modelName.c_str());
+
+    // Clean up failed attempt
+    if (nodeModelId) {
+        gWorld->modelmanager.delbyname(altPath);
+        nodeModelId = 0;
+    }
+    delete nodeModel;
+    nodeModel = nullptr;
+
+    gLog("Failed to load model: %s\n", altPath.c_str());
     return false;
 }
 
@@ -294,23 +316,51 @@ void WorldBotNodes::DrawModel(const Vec3D& pos, const Vec4D& color)
     if (distanceToCamera > VIEW_DISTANCE)
         return;
 
-    GLfloat currentColor[4];
-    glGetFloatv(GL_CURRENT_COLOR, currentColor);
-
-    glColor4f(color.x, color.y, color.z, color.w);
-
+    // Save states
+    glPushAttrib(GL_ALL_ATTRIB_BITS);
+    glMatrixMode(GL_MODELVIEW);
     glPushMatrix();
-    {
-        glTranslatef(pos.x, pos.y, pos.z);
 
-        const float scale = 1.0f;
-        glScalef(scale, scale, scale);
+    // Setup rendering states
+    glEnable(GL_TEXTURE_2D);
+    glEnable(GL_LIGHTING);
+    glEnable(GL_LIGHT0);
+    glEnable(GL_COLOR_MATERIAL);
+    glColorMaterial(GL_FRONT_AND_BACK, GL_AMBIENT_AND_DIFFUSE);
 
-        nodeModel->draw();
+    // Enable alpha blending
+    glEnable(GL_BLEND);
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+
+    // Enable alpha testing for transparent models
+    glEnable(GL_ALPHA_TEST);
+    glAlphaFunc(GL_GREATER, 0.3f);
+
+    glColor4f(1.0f, 1.0f, 1.0f, 1.0f);
+
+    // Transform model
+    glTranslatef(pos.x, pos.y, pos.z);
+
+    // Rotate model to face a random direction
+    static float randomRotation = randint(0, 360);
+    glRotatef(randomRotation, 0, 1, 0);
+
+    // Scale model
+    const float scale = 2.0f;  // Made it a bit bigger
+    glScalef(scale, scale, scale);
+
+    // Update animation time
+    if (nodeModel->header.nAnimations > 0) {
+        nodeModel->animtime = gWorld->animtime;
+        nodeModel->animate(0);
     }
-    glPopMatrix();
 
-    glColor4fv(currentColor);
+    // Draw the model
+    nodeModel->draw();
+
+    // Restore states
+    glPopMatrix();
+    glPopAttrib();
 }
 
 void WorldBotNodes::InitVBO()

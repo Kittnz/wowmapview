@@ -94,6 +94,8 @@ private:
     int nodeModelId = 0;
     std::string modelName;
     void DrawModel(const Vec3D& pos, const Vec4D& color);
+    int randomAnim = 0;
+
 };
 
 #endif
