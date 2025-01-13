@@ -11,17 +11,13 @@
 #include "defines/Common.h"
 #include "model.h"
 
-struct TravelNode {
-    uint32 id;
-    std::string name;
+struct TravelNodePathPoint {
+    uint32 fromNodeId;
+    uint32 toNodeId;
+    uint32 nr;
     uint32 mapId;
-    float x;
-    float y;
-    float z;
-    uint8 linked;
-
-    Vec3D position;
-    float radius;
+    float x, y, z;
+    Vec3D position; // Converted position
 };
 
 struct TravelNodeLink {
@@ -34,18 +30,23 @@ struct TravelNodeLink {
     float extraCost;
     bool calculated;
     uint8 maxCreature[3];
+    std::vector<TravelNodePathPoint*> points;
 };
 
-struct TravelNodePathPoint {
-    uint32 fromNodeId;
-    uint32 toNodeId;
-    uint32 nr;
+struct TravelNode {
+    uint32 id;
+    std::string name;
     uint32 mapId;
-    float x, y, z;
-    Vec3D position; // Converted position
+    float x;
+    float y;
+    float z;
+    uint8 linked;
+
+    Vec3D position;
+    float radius;
+
+    std::vector<TravelNodeLink*> links;
 };
-
-
 
 class WorldBotNodes {
 public:
@@ -73,11 +74,24 @@ private:
         Vec3D end;
     };
 
+    struct PathPointVertex {
+        float x, y, z;          // Position
+        float r, g, b, a;       // Color
+        enum VertexType {
+            LINE,               // Line segment vertex
+            POINT               // Path point vertex
+        } type;
+    };
+
     GLuint sphereDisplayList;
     GLuint linkVBO;
+    GLuint pathPointVBO;
 
     std::vector<LinkVertexData> linkVertices;
+    std::vector<PathPointVertex> pathPointVertices;
+
     bool linksNeedUpdate;
+    bool pathPointsNeedUpdate = true;
 
     void DrawBox(const Vec3D& pos, float size, const Vec4D& color);
 
@@ -85,7 +99,9 @@ private:
     void UpdateLinkVBO();
     void DrawLinks(int mapId);
 
+    void UpdatePathPointVBO();
     void DrawPathPoints(int mapId);
+
     void DrawSphere(const Vec3D& pos, float radius, const Vec4D& color);
     void DrawNodeLabel(const TravelNode& node);
     bool WorldToScreen(const Vec3D& worldPos, Vec2D& screenPos, bool& isVisible);

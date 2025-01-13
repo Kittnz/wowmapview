@@ -38,6 +38,15 @@ WorldBotNodes::~WorldBotNodes()
     if (linkVBO) {
         glDeleteBuffersARB(1, &linkVBO);
     }
+
+    if (pathPointVBO) {
+        glDeleteBuffersARB(1, &pathPointVBO);
+    }
+
+    // Clear links for each node
+    for (auto& node : nodes) {
+        node.links.clear();
+    }
 }
 
 void WorldBotNodes::LoadFromDB()
@@ -98,10 +107,6 @@ void WorldBotNodes::LoadFromDB()
         } while (result->NextRow());
     }
 
-	// Update link VBO
-    linksNeedUpdate = true;
-    UpdateLinkVBO();
-
     // Load path points
     result = GameDb.Query("SELECT node_id, to_node_id, nr, map_id, x, y, z FROM ai_playerbot_travelnode_path ORDER BY node_id, to_node_id, nr");
     if (result)
@@ -122,6 +127,42 @@ void WorldBotNodes::LoadFromDB()
             pathPoints.push_back(point);
         } while (result->NextRow());
     }
+
+    // Link path points to their respective links and nodes
+    for (auto& link : links)
+    {
+        // Find corresponding nodes for this link
+        auto fromNode = std::find_if(nodes.begin(), nodes.end(),
+            [&](const TravelNode& n) { return n.id == link.fromNodeId; });
+
+        auto toNode = std::find_if(nodes.begin(), nodes.end(),
+            [&](const TravelNode& n) { return n.id == link.toNodeId; });
+
+        if (fromNode != nodes.end() && toNode != nodes.end())
+        {
+            // Add link to the from node's links
+            fromNode->links.push_back(&link);
+
+            // Find path points for this link
+            for (auto& point : pathPoints)
+            {
+                if (point.fromNodeId == link.fromNodeId && point.toNodeId == link.toNodeId)
+                {
+                    link.points.push_back(&point);
+                }
+            }
+
+            // Sort path points by their nr to ensure correct order
+            std::sort(link.points.begin(), link.points.end(),
+                [](const TravelNodePathPoint* a, const TravelNodePathPoint* b) {
+                    return a->nr < b->nr;
+                });
+        }
+    }
+
+    // Update VBOs
+    linksNeedUpdate = true;
+    UpdateLinkVBO();
 }
 
 void WorldBotNodes::DrawSphere(const Vec3D& pos, float radius, const Vec4D& color)
@@ -159,7 +200,7 @@ void WorldBotNodes::Draw(int mapId)
     glEnable(GL_DEPTH_TEST);
     glDepthMask(GL_FALSE);
 
-    DrawLinks(mapId);
+    //DrawLinks(mapId);
 
     // Reset states for model drawing
     glPopAttrib();
@@ -173,7 +214,7 @@ void WorldBotNodes::Draw(int mapId)
     glEnable(GL_DEPTH_TEST);
     glDepthMask(GL_FALSE);
 
-    //DrawPathPoints(mapId);
+    DrawPathPoints(mapId);
 
     for (const auto& node : nodes)
     {
@@ -371,6 +412,8 @@ void WorldBotNodes::InitVBO()
     // Create VBO
     glGenBuffersARB(1, &linkVBO);
     linksNeedUpdate = true;
+    glGenBuffersARB(1, &pathPointVBO);
+    pathPointsNeedUpdate = true;
 }
 
 void WorldBotNodes::UpdateLinkVBO()
@@ -447,22 +490,144 @@ void WorldBotNodes::DrawLinks(int mapId)
     glPopClientAttrib();
 }
 
+void WorldBotNodes::UpdatePathPointVBO()
+{
+    pathPointVertices.clear();
+
+    Vec4D startNodeColor(0.0f, 1.0f, 0.0f, 0.7f);    // Green for start nodes
+    Vec4D endNodeColor(1.0f, 0.0f, 0.0f, 0.7f);      // Red for end nodes
+    Vec4D pathPointColor(1.0f, 1.0f, 0.0f, 0.7f);    // Yellow for path points
+    Vec4D connectionColor(0.5f, 0.5f, 1.0f, 0.7f);   // Blue for connections
+
+    for (const auto& node : nodes)
+    {
+        if (node.mapId != gWorld->currentMapId)
+            continue;
+
+        for (const auto& link : node.links)
+        {
+            auto toNode = std::find_if(nodes.begin(), nodes.end(),
+                [&](const TravelNode& n) { return n.id == link->toNodeId; });
+
+            if (toNode->mapId != gWorld->currentMapId)
+                continue;
+
+            // If no path points, draw direct line between nodes
+            if (link->points.empty())
+            {
+                pathPointVertices.push_back({
+                    node.position.x, node.position.y, node.position.z,
+                    startNodeColor.x, startNodeColor.y, startNodeColor.z, startNodeColor.w,
+                    PathPointVertex::LINE
+                    });
+                pathPointVertices.push_back({
+                    toNode->position.x, toNode->position.y, toNode->position.z,
+                    endNodeColor.x, endNodeColor.y, endNodeColor.z, endNodeColor.w,
+                    PathPointVertex::LINE
+                    });
+                continue;
+            }
+
+            // Draw line from start node to first path point
+            pathPointVertices.push_back({
+                node.position.x, node.position.y, node.position.z,
+                startNodeColor.x, startNodeColor.y, startNodeColor.z, startNodeColor.w,
+                PathPointVertex::LINE
+                });
+            pathPointVertices.push_back({
+                link->points.front()->position.x,
+                link->points.front()->position.y,
+                link->points.front()->position.z,
+                connectionColor.x, connectionColor.y, connectionColor.z, connectionColor.w,
+                PathPointVertex::LINE
+                });
+
+            // Draw lines between path points
+            for (auto it = link->points.begin(); it != link->points.end(); ++it)
+            {
+                auto nextIt = std::next(it);
+                if (nextIt == link->points.end())
+                {
+                    // Draw line to end node for last point
+                    pathPointVertices.push_back({
+                        (*it)->position.x, (*it)->position.y, (*it)->position.z,
+                        connectionColor.x, connectionColor.y, connectionColor.z, connectionColor.w,
+                        PathPointVertex::LINE
+                        });
+                    pathPointVertices.push_back({
+                        toNode->position.x, toNode->position.y, toNode->position.z,
+                        endNodeColor.x, endNodeColor.y, endNodeColor.z, endNodeColor.w,
+                        PathPointVertex::LINE
+                        });
+                }
+                else
+                {
+                    // Draw line to next point
+                    pathPointVertices.push_back({
+                        (*it)->position.x, (*it)->position.y, (*it)->position.z,
+                        connectionColor.x, connectionColor.y, connectionColor.z, connectionColor.w,
+                        PathPointVertex::LINE
+                        });
+                    pathPointVertices.push_back({
+                        (*nextIt)->position.x, (*nextIt)->position.y, (*nextIt)->position.z,
+                        connectionColor.x, connectionColor.y, connectionColor.z, connectionColor.w,
+                        PathPointVertex::LINE
+                        });
+                }
+            }
+        }
+    }
+
+    // If vertices are empty, return
+    if (pathPointVertices.empty())
+        return;
+
+    // Delete existing VBO if it exists
+    if (pathPointVBO)
+        glDeleteBuffersARB(1, &pathPointVBO);
+
+    // Generate new VBO
+    glGenBuffersARB(1, &pathPointVBO);
+    glBindBufferARB(GL_ARRAY_BUFFER_ARB, pathPointVBO);
+    glBufferDataARB(GL_ARRAY_BUFFER_ARB,
+        pathPointVertices.size() * sizeof(PathPointVertex),
+        pathPointVertices.data(),
+        GL_STATIC_DRAW_ARB);
+    glBindBufferARB(GL_ARRAY_BUFFER_ARB, 0);
+}
+
 void WorldBotNodes::DrawPathPoints(int mapId)
 {
-    Vec4D pathColor(1.0f, 1.0f, 0.0f, 0.7f);  // Yellow for path points
+    if (pathPointVertices.empty())
+        UpdatePathPointVBO();
 
-    for (const auto& point : pathPoints)
-    {
-        if (point.mapId != mapId)
-            continue;
+    if (pathPointVertices.empty())
+        return;
 
-        // Skip if too far from camera
-        float distanceToCamera = (point.position - gWorld->camera).length();
-        if (distanceToCamera > VIEW_DISTANCE)
-            continue;
+    glLineWidth(2.0f);  // Thicker lines for better visibility
 
-        DrawSphere(point.position, PATH_POINT_SIZE, pathColor);
-    }
+    // Save vertex array client state
+    glPushClientAttrib(GL_CLIENT_VERTEX_ARRAY_BIT);
+
+    // Bind VBO
+    glBindBufferARB(GL_ARRAY_BUFFER_ARB, pathPointVBO);
+    glEnableClientState(GL_VERTEX_ARRAY);
+    glVertexPointer(3, GL_FLOAT, sizeof(PathPointVertex), 0);
+
+    // Enable color pointer
+    glEnableClientState(GL_COLOR_ARRAY);
+    glColorPointer(4, GL_FLOAT, sizeof(PathPointVertex), (void*)(3 * sizeof(float)));
+
+    // Draw all lines
+    glDrawArrays(GL_LINES, 0, pathPointVertices.size());
+
+    // Cleanup
+    glDisableClientState(GL_COLOR_ARRAY);
+    glDisableClientState(GL_VERTEX_ARRAY);
+    glBindBufferARB(GL_ARRAY_BUFFER_ARB, 0);
+
+    glPopClientAttrib();
+    glLineWidth(1.0f);  // Reset line width
 }
 
 void WorldBotNodes::DrawNodeLabel(const TravelNode& node)
