@@ -10,46 +10,66 @@ GuiManager::~GuiManager() {
 }
 
 bool GuiManager::Init(SDL_Surface* screen) {
+    if (initialized) {
+        gLog("GUI Manager already initialized\n");
+        return true;
+    }
+
     if (!screen) {
         gLog("Invalid screen surface passed to GUI manager\n");
         return false;
     }
 
+    if (ImGui::GetCurrentContext()) {
+        gLog("ImGui context already exists\n");
+        return false;
+    }
+
     IMGUI_CHECKVERSION();
     ImGui::CreateContext();
+    if (!ImGui::GetCurrentContext()) {
+        gLog("Failed to create ImGui context\n");
+        return false;
+    }
 
     ImGuiIO& io = ImGui::GetIO();
     io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
     io.DisplaySize = ImVec2((float)video.xres, (float)video.yres);
     io.DeltaTime = 1.0f / 60.0f;
 
-    // Setup style
     ImGui::StyleColorsDark();
     ImGuiStyle& style = ImGui::GetStyle();
     style.WindowRounding = 0.0f;
     style.Colors[ImGuiCol_WindowBg].w = 0.8f;
 
-    // Setup Platform/Renderer backends
     if (!ImGui_ImplSDL1_Init()) {
         gLog("Failed to initialize ImGui SDL1 backend\n");
+        ImGui::DestroyContext();
         return false;
     }
 
     if (!ImGui_ImplOpenGL2_Init()) {
         gLog("Failed to initialize ImGui OpenGL2 backend\n");
         ImGui_ImplSDL1_Shutdown();
+        ImGui::DestroyContext();
         return false;
     }
 
-    gLog("GUI Manager initialized successfully\n");
     initialized = true;
+    gLog("GUI Manager initialized successfully\n");
     return true;
 }
 
 void GuiManager::Shutdown() {
-    ImGui_ImplOpenGL2_Shutdown();
-    ImGui_ImplSDL1_Shutdown();
-    ImGui::DestroyContext();
+    if (!initialized)
+        return;
+
+    if (ImGui::GetCurrentContext()) {
+        ImGui_ImplOpenGL2_Shutdown();
+        ImGui_ImplSDL1_Shutdown();
+        ImGui::DestroyContext();
+    }
+
     initialized = false;
 }
 
@@ -80,33 +100,40 @@ void GuiManager::Render(World* world, Test* test) {
     if (showNodeControls)
         RenderNodeControls(world);
 
-    // Render ImGui
     ImGui::Render();
 
-    // Save OpenGL state
-    GLint last_texture;
-    glGetIntegerv(GL_TEXTURE_BINDING_2D, &last_texture);
-    GLint last_viewport[4];
-    glGetIntegerv(GL_VIEWPORT, last_viewport);
-    GLint last_scissor_box[4];
-    glGetIntegerv(GL_SCISSOR_BOX, last_scissor_box);
+    // Take control of rendering state
+    glPushAttrib(GL_ALL_ATTRIB_BITS); // Save ALL states
 
-    // Setup render state
+    // Set up our own state explicitly
     glEnable(GL_BLEND);
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
     glDisable(GL_CULL_FACE);
     glDisable(GL_DEPTH_TEST);
-    glEnable(GL_SCISSOR_TEST);
+    glDisable(GL_LIGHTING);
     glEnable(GL_TEXTURE_2D);
 
+    // Ensure we're in projection mode
+    glMatrixMode(GL_PROJECTION);
+    glPushMatrix();
+    glLoadIdentity();
+    glOrtho(0, video.xres, video.yres, 0, -1, 1);
+
+    glMatrixMode(GL_MODELVIEW);
+    glPushMatrix();
+    glLoadIdentity();
+
+    // Render ImGui
     ImGui_ImplOpenGL2_RenderDrawData(ImGui::GetDrawData());
 
-    // Restore modified GL state
-    glBindTexture(GL_TEXTURE_2D, last_texture);
-    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-    glDisable(GL_SCISSOR_TEST);
-    glViewport(last_viewport[0], last_viewport[1],
-        (GLsizei)last_viewport[2], (GLsizei)last_viewport[3]);
+    // Restore matrices
+    glMatrixMode(GL_MODELVIEW);
+    glPopMatrix();
+    glMatrixMode(GL_PROJECTION);
+    glPopMatrix();
+
+    // Restore all states
+    glPopAttrib();
 }
 
 void GuiManager::RenderMainControls(Test* test) {
