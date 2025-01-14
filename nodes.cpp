@@ -230,6 +230,15 @@ void WorldBotNodes::Draw(int mapId)
 
     glPopAttrib();
 
+    // Now DrawNodeLabel with fresh state
+    glPushAttrib(GL_ENABLE_BIT | GL_DEPTH_BUFFER_BIT | GL_CURRENT_BIT);
+
+    glEnable(GL_BLEND);
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+    glDisable(GL_TEXTURE_2D);
+    glEnable(GL_DEPTH_TEST);
+    glDepthMask(GL_FALSE);
+
     // Draw labels last
     for (const auto& node : nodes)
     {
@@ -238,6 +247,8 @@ void WorldBotNodes::Draw(int mapId)
 
         DrawNodeLabel(node);
     }
+
+    glPopAttrib();
 }
 
 void WorldBotNodes::DrawBox(const Vec3D& pos, float size, const Vec4D& color)

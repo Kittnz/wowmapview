@@ -121,7 +121,7 @@ int main(int argc, char *argv[])
     int xres = 1600;
     int yres = 1200;
 
-    bool usePatch = true;
+    bool usePatch = false;
 
     const char *override_game_path = NULL;
     int maxFps = 60;

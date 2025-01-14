@@ -3,24 +3,19 @@
 
 #include "appstate.h"
 #include "video.h"
-
 #include "world.h"
+#include "gui_manager.h"
 
+class GuiManager;
 
 class Test :public AppState
 {
-	GLuint tex;
+public:
 
-	float ah,av,moving,strafing,updown,mousedir,movespd;
+	float ah, av, moving, strafing, updown, mousedir, movespd;
 	bool look;
 	bool mapmode;
 	bool hud;
-
-	World *world;
-
-
-public:
-
 
 	Test(World *w, float ah0 = -90.0f, float av0 = -30.0f);
 	int getMapId() const { return world->currentMapId; }
@@ -36,7 +31,10 @@ public:
 	void moveToNearestNode();
 	void moveToNode(const TravelNode& node);
 
+	GuiManager guiManager;
+	GLuint tex;
 
+	World* world;
 };
 
 

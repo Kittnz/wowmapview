@@ -36,6 +36,7 @@ set(SOURCES
     database/QueryResult.cpp
     nodes.cpp
     objects/WorldObject.cpp
+    gui_manager.cpp
 )
 
 set(HEADERS
@@ -74,6 +75,7 @@ set(HEADERS
     defines/DBCFile.h
     nodes.h
     objects/WorldObject.h
+    gui_manager.h
 )
 
 # Platform-specific settings
@@ -83,6 +85,25 @@ if(WIN32)
     set(MYSQL_INCLUDE_DIR "${CMAKE_SOURCE_DIR}/MySQL/include")
     set(MYSQL_LIBRARY_DIR "${CMAKE_SOURCE_DIR}/MySQL/lib")
 endif()
+
+# ImGui
+set(IMGUI_DIR "${CMAKE_SOURCE_DIR}/imgui")
+set(IMGUI_SOURCES
+    ${IMGUI_DIR}/imgui.cpp
+    ${IMGUI_DIR}/imgui_demo.cpp
+    ${IMGUI_DIR}/imgui_draw.cpp
+    ${IMGUI_DIR}/imgui_tables.cpp
+    ${IMGUI_DIR}/imgui_widgets.cpp
+    ${IMGUI_DIR}/backends/imgui_impl_opengl2.cpp
+	imgui_impl_sdl1.cpp
+)
+
+add_library(imgui STATIC ${IMGUI_SOURCES})
+target_include_directories(imgui PUBLIC 
+    ${IMGUI_DIR} 
+    ${IMGUI_DIR}/backends
+    ${SDL_INCLUDE_DIR}
+)
 
 # Configure zlib
 set(ZLIB_PUBLIC_HDRS
@@ -135,6 +156,8 @@ target_include_directories(wowmapview PRIVATE
     ${SDL_INCLUDE_DIR}
     ${MYSQL_INCLUDE_DIR}
     ${CMAKE_SOURCE_DIR}
+    ${IMGUI_DIR}
+    ${IMGUI_DIR}/backends
     zlib
     bzip2
     libmpq
@@ -153,6 +176,7 @@ target_link_libraries(wowmapview PRIVATE
     libmpq
     opengl32
     glu32
+    imgui
 )
 
 if(MSVC)

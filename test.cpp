@@ -3,6 +3,9 @@
 #include "areadb.h"
 #include "shaders.h"
 #include "Objects/WorldObject.h"
+#include "test.h"
+#include "gui_manager.h"
+#include "SDL.h"
 #include <cmath>
 #include <string>
 
@@ -20,6 +23,17 @@ using namespace std;
 
 Test::Test(World *w, float ah0, float av0): world(w), ah(ah0), av(av0)
 {
+	// Initialize GUI
+	SDL_Surface* screen = SDL_GetVideoSurface();
+	if (!screen) {
+		gLog("Error: Could not get video surface for GUI initialization\n");
+		return;
+	}
+	if (!guiManager.Init(screen)) {
+		gLog("Error: Failed to initialize GUI manager\n");
+		return;
+	}
+
 	moving = strafing = updown = 0;
 
 	mousedir = -1.0f;
@@ -50,11 +64,16 @@ Test::Test(World *w, float ah0, float av0): world(w), ah(ah0), av(av0)
 
 Test::~Test()
 {
+	guiManager.Shutdown();
 	delete world;
 }
 
 void Test::tick(float t, float dt)
 {
+	// Update ImGui timing
+	ImGuiIO& io = ImGui::GetIO();
+	io.DeltaTime = dt;
+
 	Vec3D dir(1, 0, 0);
 	rotate(0, 0, &dir.x, &dir.y, av * PI / 180.0f);
 	rotate(0, 0, &dir.x, &dir.z, ah * PI / 180.0f);
@@ -194,6 +213,8 @@ void Test::display(float t, float dt)
 		*/
 	}
 
+	// GUI
+	guiManager.Render(world, this);
 };
 
 void Test::moveToNearestNode()
@@ -241,6 +262,9 @@ void Test::moveToNode(const TravelNode& node)
 
 void Test::keypressed(SDL_KeyboardEvent *e)
 {
+	if (guiManager.HandleEvent((SDL_Event*)e) && ImGui::GetIO().WantCaptureKeyboard)
+		return;
+
 	if (e->type == SDL_KEYDOWN) {
 		// key DOWN
 
@@ -448,6 +472,9 @@ void Test::keypressed(SDL_KeyboardEvent *e)
 
 void Test::mousemove(SDL_MouseMotionEvent *e)
 {
+	if (guiManager.HandleEvent((SDL_Event*)e) && ImGui::GetIO().WantCaptureMouse)
+		return;
+
 	if (look || fullscreen) {
 		ah += e->xrel / XSENS;
 		av += mousedir * e->yrel / YSENS;
@@ -459,6 +486,9 @@ void Test::mousemove(SDL_MouseMotionEvent *e)
 
 void Test::mouseclick(SDL_MouseButtonEvent *e)
 {
+	if (guiManager.HandleEvent((SDL_Event*)e) && ImGui::GetIO().WantCaptureMouse)
+		return;
+
 	if (e->type == SDL_MOUSEBUTTONDOWN) {
 		look = true;
 	} else if (e->type == SDL_MOUSEBUTTONUP) {
