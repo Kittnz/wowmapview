@@ -100,122 +100,107 @@ void Test::tick(float t, float dt)
 void Test::display(float t, float dt)
 {
 	if (mapmode && world->minimap) {
-		// show map
-        // TODO: try to use a real map from WoW? either the large map or the minimap would be nice
+		// Show minimap
 		video.clearScreen();
 		video.set2D();
 
 		const int len = 768;
 		const int basex = 200;
 		const int basey = 0;
-		glColor4f(1,1,1,1);
+		glColor4f(1, 1, 1, 1);
 		glEnable(GL_TEXTURE_2D);
 		glBindTexture(GL_TEXTURE_2D, world->minimap);
 		glBegin(GL_QUADS);
-		glTexCoord2f(0,0);
-		glVertex2i(basex,basey);
-		glTexCoord2f(1,0);
-		glVertex2i(basex+len,basey);
-		glTexCoord2f(1,1);
-		glVertex2i(basex+len,basey+len);
-		glTexCoord2f(0,1);
-		glVertex2i(basex,basey+len);
+		glTexCoord2f(0, 0);
+		glVertex2i(basex, basey);
+		glTexCoord2f(1, 0);
+		glVertex2i(basex + len, basey);
+		glTexCoord2f(1, 1);
+		glVertex2i(basex + len, basey + len);
+		glTexCoord2f(0, 1);
+		glVertex2i(basex, basey + len);
 		glEnd();
 
 		glDisable(GL_TEXTURE_2D);
 		glBegin(GL_LINES);
-		float fx, fz;
-		fx = basex + world->camera.x / TILESIZE * 12.0f;
-		fz = basey + world->camera.z / TILESIZE * 12.0f;
+		float fx = basex + world->camera.x / TILESIZE * 12.0f;
+		float fz = basey + world->camera.z / TILESIZE * 12.0f;
 		glVertex2f(fx, fz);
-		glColor4f(1,1,1,0);
-		glVertex2f(fx + 10.0f*cosf(ah/180.0f*PI), fz + 10.0f*sinf(ah/180.0f*PI));
+		glColor4f(1, 1, 1, 0);
+		glVertex2f(fx + 10.0f * cosf(ah / 180.0f * PI), fz + 10.0f * sinf(ah / 180.0f * PI));
 		glEnd();
-	} else {
-        // draw 3D view
+	}
+	else {
+		// Draw 3D world first
 		video.set3D();
 		world->draw();
-		
+
+		// Switch to 2D for overlays
 		video.set2D();
-		glEnable(GL_BLEND);
-		glBlendFunc (GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-
-		glEnable(GL_TEXTURE_2D);
+		glPushAttrib(GL_ALL_ATTRIB_BITS);
 		glDisable(GL_DEPTH_TEST);
-		glDisable(GL_CULL_FACE);
+		glEnable(GL_BLEND);
+		glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+		glEnable(GL_TEXTURE_2D);
 		glDisable(GL_LIGHTING);
-		glColor4f(1,1,1,1);
+		glDisable(GL_CULL_FACE);
+		glColor4f(1, 1, 1, 1);
 
+		// Draw HUD
 		if (hud) {
-			f16->print(5,0,"%.2f fps", gFPS);
+			f16->print(5, 0, "%.2f fps", gFPS);
 
-			//char *sn = world->skies->getSkyName();
-			//if (sn)	f16->print(5,60,"%s", sn);
-
-			// TODO: look up WMO names/group names as well from some client db?
 			unsigned int areaID = world->getAreaID();
 			unsigned int regionID = 0;
-			/// Look up area
 			try {
 				AreaDB::Record rec = gAreaDB.getByAreaID(areaID);
 				std::string areaName = rec.getString(AreaDB::Name);
 				regionID = rec.getUInt(AreaDB::Region);
-				f16->print(5,20,"%s", areaName.c_str());
-			} catch(AreaDB::NotFound)
-			{
-				/// Not found, unknown area
-				//f16->print(5,20,"Unknown [%i]", areaID);
+				f16->print(5, 20, "%s", areaName.c_str());
 			}
+			catch (AreaDB::NotFound) {}
+
 			if (regionID != 0) {
-				/// Look up region
 				try {
 					AreaDB::Record rec = gAreaDB.getByAreaID(regionID);
 					std::string regionName = rec.getString(AreaDB::Name);
-					f16->print(5,40,"%s", regionName.c_str());
-				} catch(AreaDB::NotFound)
-				{
-					//f16->print(5,40,"Unknown [%i]", regionID);
+					f16->print(5, 40, "%s", regionName.c_str());
 				}
+				catch (AreaDB::NotFound) {}
 			}
 
-			//f16->print(5,60,"%d", world->modelmanager.v);
+			int time = ((int)world->time) % 2880;
+			int hh = time / 120;
+			int mm = (time % 120) / 2;
+			f16->print(video.xres - 50, 0, "%02d:%02d", hh, mm);
 
-			int time = ((int)world->time)%2880;
-			int hh,mm;
+			f16->print(5, video.yres - 42, "Camera: (%.0f, %.0f, %.0f)",
+				world->camera.x, world->camera.y, world->camera.z);
 
-            hh = time / 120;
-			mm = (time % 120) / 2;
-			
-			//f16->print(5, 60, "%02d:%02d", hh,mm);
-			f16->print(video.xres - 50, 0, "%02d:%02d", hh,mm);
-
-			// Show the raw camera coordinates
-			f16->print(5, video.yres - 42, "Camera: (%.0f, %.0f, %.0f)", world->camera.x, world->camera.y, world->camera.z);
-
-			// Convert camera position to xyz coordinates using WorldObject's conversion method
 			Position cameraPos(world->camera.x, world->camera.y, world->camera.z, 0.0f);
 			Position xyzPos = WorldObject::ConvertViewerCoordsToGameCoords(cameraPos);
-
-			f16->print(5, video.yres - 22, "XYZ: (%.0f, %.0f, %.0f)", xyzPos.x, xyzPos.y, xyzPos.z);
+			f16->print(5, video.yres - 22, "XYZ: (%.0f, %.0f, %.0f)",
+				xyzPos.x, xyzPos.y, xyzPos.z);
 		}
 
 		if (world->loading) {
 			const char* loadstr = "Loading...";
 			const char* oobstr = "Out of bounds";
-
-			f16->print(video.xres/2 - f16->textwidth(loadstr)/2, /*video.yres/2-8*/ 0, world->oob?oobstr:loadstr);
+			f16->print(video.xres / 2 - f16->textwidth(loadstr) / 2, 0,
+				world->oob ? oobstr : loadstr);
 		}
 
-		/*
-		f16->print(5,20,"C: %.1f", world->l_const);
-		f16->print(5,40,"L: %.2f", world->l_linear);
-		f16->print(5,60,"Q: %.3f", world->l_quadratic);
-		*/
-	}
+		// Draw node labels
+		//if (!mapmode) {
+			world->botNodes.DrawAllNodeLabels(world->currentMapId);
+		//}
 
-	// GUI
-	guiManager.Render(world, this);
-};
+		glPopAttrib();
+
+		// Draw GUI last
+		guiManager.Render(world, this);
+	}
+}
 
 void Test::moveToNearestNode()
 {

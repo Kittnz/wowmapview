@@ -67,6 +67,10 @@ public:
     std::vector<TravelNodeLink> links;
     std::vector<TravelNodePathPoint> pathPoints;
 
+    void DrawLabels(int mapId);
+    void DrawNodeLabel(const TravelNode& node);
+    void DrawAllNodeLabels(int mapId);
+
 private:
 
     struct LinkVertexData {
@@ -103,7 +107,7 @@ private:
     void DrawPathPoints(int mapId);
 
     void DrawSphere(const Vec3D& pos, float radius, const Vec4D& color);
-    void DrawNodeLabel(const TravelNode& node);
+
     bool WorldToScreen(const Vec3D& worldPos, Vec2D& screenPos, bool& isVisible);
 
     Model* nodeModel;

@@ -655,7 +655,6 @@ void World::setupFog()
 	culldistance2 = culldistance * culldistance;
 }
 
-
 void World::draw()
 {
 	WMOInstance::reset();
@@ -668,68 +667,55 @@ void World::draw()
 	modeldrawdistance2 = modeldrawdistance * modeldrawdistance;
 	doodaddrawdistance2 = doodaddrawdistance * doodaddrawdistance;
 
-	// setup camera
-	// assume identity modelview matrix ^_^
-	//glMatrixMode(GL_MODELVIEW);
-	//glLoadIdentity();
-	gluLookAt(camera.x,camera.y,camera.z, lookat.x,lookat.y,lookat.z, 0, 1, 0);
-
-	// camera is set up
+	gluLookAt(camera.x, camera.y, camera.z, lookat.x, lookat.y, lookat.z, 0, 1, 0);
 	frustum.retrieve();
 
 	if (thirdperson) {
-		Vec3D l = (lookat-camera).normalize();
-		Vec3D nc = camera + Vec3D(0,300,0);
-		Vec3D rt = (Vec3D(0,1,0) % l).normalize();
+		Vec3D l = (lookat - camera).normalize();
+		Vec3D nc = camera + Vec3D(0, 300, 0);
+		Vec3D rt = (Vec3D(0, 1, 0) % l).normalize();
 		Vec3D up = (l % rt).normalize();
 		float fl = 256.0f;
 		Vec3D fp = camera + l * fl;
 		glLoadIdentity();
-		gluLookAt(nc.x,nc.y,nc.z, camera.x,camera.y,camera.z, 1, 0, 0);
+		gluLookAt(nc.x, nc.y, nc.z, camera.x, camera.y, camera.z, 1, 0, 0);
 	}
 
 	glDisable(GL_LIGHTING);
-	glColor4f(1,1,1,1);
-
-    //int tt = 1440;
-	//if (modelmanager.v>0) {
-	//	tt = (modelmanager.v *180 + 1440) % 2880;
-	//}
+	glColor4f(1, 1, 1, 1);
 
 	hadSky = false;
-	for (int j=0; j<3; j++) {
-		for (int i=0; i<3; i++) {
-			if (oktile(i,j) && current[j][i] != 0) current[j][i]->drawSky();
+	for (int j = 0; j < 3; j++) {
+		for (int i = 0; i < 3; i++) {
+			if (oktile(i, j) && current[j][i] != 0) current[j][i]->drawSky();
 			if (hadSky) break;
 		}
 		if (hadSky) break;
 	}
 	if (gnWMO && !hadSky) {
-		for (int i=0; i<gnWMO; i++) {
+		for (int i = 0; i < gnWMO; i++) {
 			gwmois[i].wmo->drawSkybox();
 			if (hadSky) break;
 		}
 	}
+
 	glEnable(GL_CULL_FACE);
 	glDisable(GL_BLEND);
 	glDisable(GL_TEXTURE_2D);
 	glDisable(GL_DEPTH_TEST);
 	glDisable(GL_FOG);
 
-	int daytime = ((int)time)%2880;
+	int daytime = ((int)time) % 2880;
 	outdoorLightStats = ol->getLightStats(daytime);
 	skies->initSky(camera, daytime);
 
 	if (!hadSky) hadSky = skies->drawSky(camera);
 
-	// clearing the depth buffer only - color buffer is/has been overwritten anyway
-	// unless there is no sky OR skybox
 	GLbitfield clearmask = GL_DEPTH_BUFFER_BIT;
 	if (!hadSky) clearmask |= GL_COLOR_BUFFER_BIT;
-	glClear(clearmask); 
+	glClear(clearmask);
 
 	glDisable(GL_TEXTURE_2D);
-
 
 	outdoorLighting();
 	outdoorLights(true);
@@ -743,38 +729,29 @@ void World::draw()
 		glDisable(GL_DEPTH_TEST);
 		glDisable(GL_LIGHTING);
 		glColor3fv(this->skies->colorSet[FOG_COLOR]);
-		//glColor3f(0,1,0);
-		//glDisable(GL_FOG);
 		const int lrr = 2;
-		for (int i=cx-lrr; i<=cx+lrr; i++) {
-			for (int j=cz-lrr; j<=cz+lrr; j++) {
-				// TODO: some annoying visual artifacts when the verylowres terrain overlaps
-				// maptiles that are close (1-off) - figure out how to fix.
-				// still less annoying than hoels in the horizon when only 2-off verylowres tiles are drawn
-				if ( !(i==cx&&j==cz) && oktile(i,j) && lowrestiles[j][i]) {
+		for (int i = cx - lrr; i <= cx + lrr; i++) {
+			for (int j = cz - lrr; j <= cz + lrr; j++) {
+				if (!(i == cx && j == cz) && oktile(i, j) && lowrestiles[j][i]) {
 					glCallList(lowrestiles[j][i]);
 				}
 			}
 		}
-		//glEnable(GL_FOG);
 	}
 
-	// Draw height map
+	// Height map
 	glEnableClientState(GL_VERTEX_ARRAY);
 	glEnableClientState(GL_NORMAL_ARRAY);
 
 	glEnable(GL_DEPTH_TEST);
-	glDepthFunc(GL_LEQUAL); // less z-fighting artifacts this way, I think
+	glDepthFunc(GL_LEQUAL);
 	glEnable(GL_LIGHTING);
-
-
 	glEnable(GL_COLOR_MATERIAL);
-	//glColorMaterial(GL_FRONT, GL_DIFFUSE);
 	glColorMaterial(GL_FRONT_AND_BACK, GL_AMBIENT_AND_DIFFUSE);
-	glColor4f(1,1,1,1);
+	glColor4f(1, 1, 1, 1);
 
 	glEnable(GL_BLEND);
-	glBlendFunc (GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
 	glClientActiveTextureARB(GL_TEXTURE0_ARB);
 	glEnableClientState(GL_TEXTURE_COORD_ARRAY);
@@ -788,12 +765,11 @@ void World::draw()
 
 	glClientActiveTextureARB(GL_TEXTURE0_ARB);
 
-	// height map w/ a zillion texture passes
 	if (drawterrain) {
-		for (int j=0; j<3; j++) {
-			for (int i=0; i<3; i++) {
-				uselowlod = drawfog;// && i==1 && j==1;
-				if (oktile(i,j) && current[j][i] != 0) current[j][i]->draw();
+		for (int j = 0; j < 3; j++) {
+			for (int i = 0; i < 3; i++) {
+				uselowlod = drawfog;
+				if (oktile(i, j) && current[j][i] != 0) current[j][i]->draw();
 			}
 		}
 	}
@@ -804,100 +780,75 @@ void World::draw()
 	glEnable(GL_TEXTURE_2D);
 
 	glDisable(GL_CULL_FACE);
-
 	glDisable(GL_BLEND);
 	glDisable(GL_ALPHA_TEST);
 
-	// gosh darn alpha blended evil
-	for (int j=0; j<3; j++) {
-		for (int i=0; i<3; i++) {
-			if (drawterrain && oktile(i,j) && current[j][i] != 0)	current[j][i]->drawWater();
+	for (int j = 0; j < 3; j++) {
+		for (int i = 0; i < 3; i++) {
+			if (drawterrain && oktile(i, j) && current[j][i] != 0) current[j][i]->drawWater();
 		}
 	}
-	glColor4f(1,1,1,1);
+
+	glColor4f(1, 1, 1, 1);
 	glEnable(GL_BLEND);
-
-
-	// unbind hardware buffers
 	glBindBufferARB(GL_ARRAY_BUFFER_ARB, 0);
-
-
 	glEnable(GL_CULL_FACE);
 
 	glDisable(GL_BLEND);
 	glDisable(GL_ALPHA_TEST);
 
-	// TEMP: for fucking around with lighting
-	for (int i=0; i<8; i++) {
+	for (int i = 0; i < 8; i++) {
 		GLuint light = GL_LIGHT0 + i;
 		glLightf(light, GL_CONSTANT_ATTENUATION, l_const);
 		glLightf(light, GL_LINEAR_ATTENUATION, l_linear);
 		glLightf(light, GL_QUADRATIC_ATTENUATION, l_quadratic);
 	}
 
-	if (gnWMO) {
+	if (gnWMO && drawwmo) {
 		oob = false;
-		for (int i=0; i<gnWMO; i++) {
+		for (int i = 0; i < gnWMO; i++) {
 			gwmois[i].draw();
 		}
 	}
-	
-	// map objects
-	for (int j=0; j<3; j++) {
-		for (int i=0; i<3; i++) {
-			if (oktile(i,j) && drawwmo && current[j][i] != 0) current[j][i]->drawObjects();
+
+	for (int j = 0; j < 3; j++) {
+		for (int i = 0; i < 3; i++) {
+			if (oktile(i, j) && drawwmo && current[j][i] != 0) current[j][i]->drawObjects();
 		}
 	}
 
 	outdoorLights(true);
 	setupFog();
 
-	glColor4f(1,1,1,1);
-	//models
-	for (int j=0; j<3; j++) {
-		for (int i=0; i<3; i++) {
-			if (oktile(i,j) && drawmodels && current[j][i] != 0) current[j][i]->drawModels();
+	glColor4f(1, 1, 1, 1);
+
+	if (drawmodels) {
+		for (int j = 0; j < 3; j++) {
+			for (int i = 0; i < 3; i++) {
+				if (oktile(i, j) && current[j][i] != 0) current[j][i]->drawModels();
+			}
 		}
 	}
 
-	/*
-	// temp frustum code
-	glDisable(GL_LIGHTING);
-	glDisable(GL_TEXTURE_2D);
-	glDisable(GL_CULL_FACE);
-	glEnable(GL_BLEND);
-	glBegin(GL_TRIANGLES);
-	glColor4f(0,1,0,0.5);
-	glVertex3fv(camera);
-	glVertex3fv(fp - rt * fl * 1.33f - up * fl);
-	glVertex3fv(fp + rt * fl * 1.33f - up * fl);
-	glColor4f(0,0,1,0.5);
-	glVertex3fv(camera);
-	fl *= 0.5f;
-	glVertex3fv(fp - rt * fl * 1.33f + up * fl);
-	glVertex3fv(fp + rt * fl * 1.33f + up * fl);
-	glEnd();
-	*/
+	// Draw node 3D geometry
+	glPushAttrib(GL_ALL_ATTRIB_BITS);
+	glDisable(GL_FOG);  // Disable fog for node geometry
+	botNodes.Draw(currentMapId);
+	glPopAttrib();
 
-	glColor4f(1,1,1,1);
+	glColor4f(1, 1, 1, 1);
 	glDisable(GL_COLOR_MATERIAL);
 
 	if (current[1][1] != 0 || oob) {
-		if (oob || (camera.x<current[1][1]->xbase) || (camera.x>(current[1][1]->xbase+TILESIZE))
-			|| (camera.z<current[1][1]->zbase) || (camera.z>(current[1][1]->zbase+TILESIZE)) )
+		if (oob || (camera.x < current[1][1]->xbase) || (camera.x > (current[1][1]->xbase + TILESIZE))
+			|| (camera.z < current[1][1]->zbase) || (camera.z > (current[1][1]->zbase + TILESIZE)))
 		{
 			ex = (int)(camera.x / TILESIZE);
 			ez = (int)(camera.z / TILESIZE);
-
 			loading = true;
 		}
 	}
-
-	botNodes.Draw(currentMapId);
-
-	botNodes.Draw(currentMapId);
 }
-
 
 void World::tick(float dt)
 {

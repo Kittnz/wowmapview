@@ -190,64 +190,39 @@ void WorldBotNodes::DrawSphere(const Vec3D& pos, float radius, const Vec4D& colo
 
 void WorldBotNodes::Draw(int mapId)
 {
-    // Save current OpenGL states
-    glPushAttrib(GL_ENABLE_BIT | GL_DEPTH_BUFFER_BIT | GL_CURRENT_BIT | GL_CLIENT_ALL_ATTRIB_BITS);
+    // Save OpenGL state
+    glPushAttrib(GL_ALL_ATTRIB_BITS);
+    glPushMatrix();
 
-    // Draw links first
+    // Setup state for 3D geometry
+    glEnable(GL_DEPTH_TEST);
     glEnable(GL_BLEND);
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
     glDisable(GL_TEXTURE_2D);
-    glEnable(GL_DEPTH_TEST);
-    glDepthMask(GL_FALSE);
+    glDisable(GL_FOG);
 
-    //DrawLinks(mapId);
+    // Draw boxes and links
+    for (const auto& node : nodes)
+    {
+        if (node.mapId != mapId)
+            continue;
 
-    // Reset states for model drawing
-    glPopAttrib();
+        float distanceToCamera = (node.position - gWorld->camera).length();
+        if (distanceToCamera > VIEW_DISTANCE)
+            continue;
 
-    // Now draw models with fresh state
-    glPushAttrib(GL_ENABLE_BIT | GL_DEPTH_BUFFER_BIT | GL_CURRENT_BIT);
+        // Draw node box
+        Vec4D color = node.linked ?
+            Vec4D(0.0f, 1.0f, 0.0f, 0.7f) : // Green for linked
+            Vec4D(1.0f, 0.0f, 0.0f, 0.7f);  // Red for unlinked
 
-    glEnable(GL_BLEND);
-    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-    glDisable(GL_TEXTURE_2D);
-    glEnable(GL_DEPTH_TEST);
-    glDepthMask(GL_FALSE);
+        DrawBox(node.position, DEFAULT_BOX_SIZE, color);
+    }
 
     DrawPathPoints(mapId);
 
-    for (const auto& node : nodes)
-    {
-        if (node.mapId != mapId)
-            continue;
-
-        Vec4D color = node.linked ?
-            Vec4D(0.0f, 1.0f, 0.0f, 0.7f) :
-            Vec4D(1.0f, 0.0f, 0.0f, 0.7f);
-
-        DrawModel(node.position, color);
-    }
-
-    glPopAttrib();
-
-    // Now DrawNodeLabel with fresh state
-    glPushAttrib(GL_ENABLE_BIT | GL_DEPTH_BUFFER_BIT | GL_CURRENT_BIT);
-
-    glEnable(GL_BLEND);
-    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-    glDisable(GL_TEXTURE_2D);
-    glEnable(GL_DEPTH_TEST);
-    glDepthMask(GL_FALSE);
-
-    // Draw labels last
-    for (const auto& node : nodes)
-    {
-        if (node.mapId != mapId)
-            continue;
-
-        DrawNodeLabel(node);
-    }
-
+    // Restore state
+    glPopMatrix();
     glPopAttrib();
 }
 
@@ -371,29 +346,25 @@ void WorldBotNodes::DrawModel(const Vec3D& pos, const Vec4D& color)
     if (distanceToCamera > VIEW_DISTANCE)
         return;
 
-    // Save states
-    glPushAttrib(GL_ALL_ATTRIB_BITS);
-    glMatrixMode(GL_MODELVIEW);
-    glPushMatrix();
-
     // Setup rendering states
+    glDisable(GL_FOG);
     glEnable(GL_TEXTURE_2D);
     glEnable(GL_LIGHTING);
     glEnable(GL_LIGHT0);
     glEnable(GL_COLOR_MATERIAL);
-    glColorMaterial(GL_FRONT_AND_BACK, GL_AMBIENT_AND_DIFFUSE);
-
-    // Enable alpha blending
     glEnable(GL_BLEND);
-    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-
-    // Enable alpha testing for transparent models
     glEnable(GL_ALPHA_TEST);
+
+    glColorMaterial(GL_FRONT_AND_BACK, GL_AMBIENT_AND_DIFFUSE);
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
     glAlphaFunc(GL_GREATER, 0.3f);
 
+    // Set model color
     glColor4f(1.0f, 1.0f, 1.0f, 1.0f);
 
-    // Transform model
+    // Model transformation
+    glMatrixMode(GL_MODELVIEW);
+    glLoadIdentity();
     glTranslatef(pos.x, pos.y, pos.z);
 
     // Rotate model to face a random direction
@@ -401,10 +372,10 @@ void WorldBotNodes::DrawModel(const Vec3D& pos, const Vec4D& color)
     glRotatef(randomRotation, 0, 1, 0);
 
     // Scale model
-    const float scale = 2.0f;  // Made it a bit bigger
+    const float scale = 2.0f;
     glScalef(scale, scale, scale);
 
-    // Update animation time
+    // Update animation time if model has animations
     if (nodeModel->header.nAnimations > 0) {
         nodeModel->animtime = gWorld->animtime;
         nodeModel->animate(0);
@@ -413,9 +384,18 @@ void WorldBotNodes::DrawModel(const Vec3D& pos, const Vec4D& color)
     // Draw the model
     nodeModel->draw();
 
-    // Restore states
-    glPopMatrix();
-    glPopAttrib();
+    // Cleanup states
+    glDisable(GL_ALPHA_TEST);
+    glDisable(GL_BLEND);
+    glDisable(GL_COLOR_MATERIAL);
+    glDisable(GL_LIGHTING);
+    glDisable(GL_LIGHT0);
+    glDisable(GL_TEXTURE_2D);
+    glEnable(GL_FOG);  // Restore fog if world uses it
+
+    // Reset color and blend mode
+    glColor4f(1.0f, 1.0f, 1.0f, 1.0f);
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 }
 
 void WorldBotNodes::InitVBO()
@@ -465,40 +445,28 @@ void WorldBotNodes::DrawLinks(int mapId)
     if (linkVertices.empty())
         return;
 
-    // Save vertex array client state
-    glPushClientAttrib(GL_CLIENT_VERTEX_ARRAY_BIT);
-
     glLineWidth(2.0f);
     glColor4f(0.0f, 1.0f, 0.0f, 0.4f);
 
-    // Bind VBO
     glBindBufferARB(GL_ARRAY_BUFFER_ARB, linkVBO);
     glEnableClientState(GL_VERTEX_ARRAY);
     glVertexPointer(3, GL_FLOAT, sizeof(Vec3D), 0);
 
-    // Draw all lines in one batch
     for (size_t i = 0; i < linkVertices.size(); i++)
     {
         const LinkVertexData& link = linkVertices[i];
-
-        // View distance culling
         float distanceFrom = (link.start - gWorld->camera).length();
         float distanceTo = (link.end - gWorld->camera).length();
 
         if (distanceFrom > VIEW_DISTANCE && distanceTo > VIEW_DISTANCE)
             continue;
 
-        // Draw line
         glDrawArrays(GL_LINES, i * 2, 2);
     }
 
-    // Cleanup
     glDisableClientState(GL_VERTEX_ARRAY);
     glBindBufferARB(GL_ARRAY_BUFFER_ARB, 0);
     glLineWidth(1.0f);
-
-    // Restore vertex array client state
-    glPopClientAttrib();
 }
 
 void WorldBotNodes::UpdatePathPointVBO()
@@ -617,10 +585,7 @@ void WorldBotNodes::DrawPathPoints(int mapId)
 
     glLineWidth(2.0f);  // Thicker lines for better visibility
 
-    // Save vertex array client state
-    glPushClientAttrib(GL_CLIENT_VERTEX_ARRAY_BIT);
-
-    // Bind VBO
+    // Bind VBO and setup vertex pointers
     glBindBufferARB(GL_ARRAY_BUFFER_ARB, pathPointVBO);
     glEnableClientState(GL_VERTEX_ARRAY);
     glVertexPointer(3, GL_FLOAT, sizeof(PathPointVertex), 0);
@@ -636,109 +601,166 @@ void WorldBotNodes::DrawPathPoints(int mapId)
     glDisableClientState(GL_COLOR_ARRAY);
     glDisableClientState(GL_VERTEX_ARRAY);
     glBindBufferARB(GL_ARRAY_BUFFER_ARB, 0);
-
-    glPopClientAttrib();
     glLineWidth(1.0f);  // Reset line width
 }
 
 void WorldBotNodes::DrawNodeLabel(const TravelNode& node)
 {
-    Vec3D camera = gWorld->camera;
-
-    // Skip if node is too far from camera
-    float distanceToCamera = (node.position - camera).length();
+    // Skip if node is too far from camera 
+    float distanceToCamera = (node.position - gWorld->camera).length();
     if (distanceToCamera > VIEW_DISTANCE)
         return;
+
+    // Calculate screen position
+    Vec2D screenPos;
+    bool isVisible;
+    WorldToScreen(node.position, screenPos, isVisible);
 
     // Create label text
     char label[256];
     snprintf(label, sizeof(label), "[%u] %s", node.id, node.name.c_str());
+    float textWidth = f16->textwidth(label);
 
-    // Calculate the position above the box in world space
-    Vec3D labelPos = node.position;
-    labelPos.y += DEFAULT_BOX_SIZE + 2.0f;
+    // Save current matrices
+    glPushMatrix();
 
-    // Transform world position to screen coordinates
-    Vec2D screenPos;
-    bool isVisible;
-    if (!WorldToScreen(labelPos, screenPos, isVisible) || !isVisible)
-        return;
-
-    // Save states
-    glPushAttrib(GL_ENABLE_BIT | GL_CURRENT_BIT);
+    // Switch to orthographic projection
     glMatrixMode(GL_PROJECTION);
     glPushMatrix();
-    glMatrixMode(GL_MODELVIEW);
-    glPushMatrix();
+    glLoadIdentity();
 
-    // Switch to 2D rendering mode
     GLint viewport[4];
     glGetIntegerv(GL_VIEWPORT, viewport);
-
-    glMatrixMode(GL_PROJECTION);
-    glLoadIdentity();
     glOrtho(0, viewport[2], viewport[3], 0, -1, 1);
 
     glMatrixMode(GL_MODELVIEW);
     glLoadIdentity();
 
-    // Calculate text position
-    float textWidth = f16->textwidth(label);
-    float screenX = screenPos.x - (textWidth / 2.0f);
-    float screenY = screenPos.y;
-
-    // Setup text rendering
-    glDisable(GL_DEPTH_TEST);
-    glDisable(GL_LIGHTING);
+    // Minimal state changes required for font rendering
     glEnable(GL_BLEND);
     glEnable(GL_TEXTURE_2D);
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
+    // Center text horizontally
+    float x = screenPos.x - textWidth / 2;
+    float y = screenPos.y;
+
     // Draw text outline
     glColor4f(0.0f, 0.0f, 0.0f, 1.0f);
-    for (int dx = -1; dx <= 1; dx++) {
-        for (int dy = -1; dy <= 1; dy++) {
-            if (dx == 0 && dy == 0) continue;
-            f16->print(screenX + dx, screenY + dy, "%s", label);
-        }
-    }
+    f16->drawtext(x - 1, y - 1, label);
+    f16->drawtext(x - 1, y + 1, label);
+    f16->drawtext(x + 1, y - 1, label);
+    f16->drawtext(x + 1, y + 1, label);
 
     // Draw text
     glColor4f(1.0f, 1.0f, 1.0f, 1.0f);
-    f16->print(screenX, screenY, "%s", label);
+    f16->drawtext(x, y, label);
 
-    // Restore states
-    glMatrixMode(GL_MODELVIEW);
-    glPopMatrix();
+    // Restore matrices
     glMatrixMode(GL_PROJECTION);
     glPopMatrix();
-    glPopAttrib();
+    glMatrixMode(GL_MODELVIEW);
+    glPopMatrix();
+}
+
+void WorldBotNodes::DrawAllNodeLabels(int mapId) {
+    for (const auto& node : nodes) {
+        if (node.mapId != mapId)
+            continue;
+
+        DrawNodeLabel(node);
+    }
 }
 
 bool WorldBotNodes::WorldToScreen(const Vec3D& worldPos, Vec2D& screenPos, bool& isVisible)
 {
-    // Get current matrices and viewport
-    GLint viewport[4];
-    GLdouble mvmatrix[16], projmatrix[16];
+    // First do a quick check if the point is behind the camera
+    Vec3D toNode = worldPos - gWorld->camera;
+    Vec3D viewDir = (gWorld->lookat - gWorld->camera).normalize();
+    float dotProduct = viewDir * toNode.normalize();
 
-    glGetIntegerv(GL_VIEWPORT, viewport);
-    glGetDoublev(GL_MODELVIEW_MATRIX, mvmatrix);
-    glGetDoublev(GL_PROJECTION_MATRIX, projmatrix);
-
-    // Project world position to screen coordinates
-    GLdouble winX, winY, winZ;
-    gluProject(worldPos.x, worldPos.y, worldPos.z,
-        mvmatrix, projmatrix, viewport,
-        &winX, &winY, &winZ);
-
-    // Check if point is behind camera or outside frustum
-    isVisible = (winZ <= 1.0f);
-    if (!isVisible)
+    // If point is behind camera (dot product < 0), reject immediately
+    if (dotProduct < 0.0f) {
+        isVisible = false;
+        screenPos.x = -1000; // Put well off screen
+        screenPos.y = -1000;
         return false;
+    }
 
-    // Convert OpenGL screen coordinates to our desired screen coordinates
-    screenPos.x = winX;
-    screenPos.y = viewport[3] - winY;  // Flip Y coordinate
+    // Distance check
+    float distance = toNode.length();
+    if (distance > VIEW_DISTANCE) {
+        isVisible = false;
+        screenPos.x = -1000;
+        screenPos.y = -1000;
+        return false;
+    }
 
-    return true;
+    // Save current matrix mode
+    GLint matrixMode;
+    glGetIntegerv(GL_MATRIX_MODE, &matrixMode);
+
+    // Setup camera view matrices
+    glMatrixMode(GL_PROJECTION);
+    glLoadIdentity();
+    gluPerspective(45.0f, (GLfloat)video.xres / (GLfloat)video.yres, 1.0f, 1024.0f);
+
+    glMatrixMode(GL_MODELVIEW);
+    glLoadIdentity();
+    gluLookAt(gWorld->camera.x, gWorld->camera.y, gWorld->camera.z,
+        gWorld->lookat.x, gWorld->lookat.y, gWorld->lookat.z,
+        0, 1, 0);
+
+    // Get matrices and viewport
+    GLint viewport[4];
+    GLdouble modelMatrix[16], projMatrix[16];
+    glGetIntegerv(GL_VIEWPORT, viewport);
+    glGetDoublev(GL_MODELVIEW_MATRIX, modelMatrix);
+    glGetDoublev(GL_PROJECTION_MATRIX, projMatrix);
+
+    GLdouble winX, winY, winZ;
+
+    // Project world coordinates
+    if (gluProject(worldPos.x, worldPos.y, worldPos.z,
+        modelMatrix, projMatrix, viewport,
+        &winX, &winY, &winZ) == GL_TRUE)
+    {
+        // Check if point is within screen bounds
+        const float margin = 10.0f;
+        isVisible = winZ >= 0.0f && winZ <= 1.0f;
+
+        if (isVisible) {
+            screenPos.x = winX;
+            screenPos.y = viewport[3] - winY;  // Flip Y coordinate
+
+            isVisible = screenPos.x >= margin &&
+                screenPos.x < (viewport[2] - margin) &&
+                screenPos.y >= margin &&
+                screenPos.y < (viewport[3] - margin);
+        }
+
+        if (!isVisible) {
+            screenPos.x = -1000;
+            screenPos.y = -1000;
+        }
+
+        // Debug output
+        /*static int debugCounter = 0;
+        if (debugCounter++ % 100 == 0) {
+            if (isVisible) {
+                gLog("Drawing label: World pos (%.1f,%.1f,%.1f) -> Screen (%.1f,%.1f,%.1f) dot=%.2f\n",
+                    worldPos.x, worldPos.y, worldPos.z,
+                    screenPos.x, screenPos.y, winZ, dotProduct);
+            }
+        }*/
+
+        glMatrixMode(matrixMode);
+        return isVisible;
+    }
+
+    glMatrixMode(matrixMode);
+    isVisible = false;
+    screenPos.x = -1000;
+    screenPos.y = -1000;
+    return false;
 }
