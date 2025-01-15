@@ -118,7 +118,7 @@ int main(int argc, char *argv[])
 
     srand((unsigned int)time(0));
 
-    int xres = 1600;
+    int xres = 1920;
     int yres = 1200;
 
     bool usePatch = false;

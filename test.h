@@ -5,6 +5,7 @@
 #include "video.h"
 #include "world.h"
 #include "gui_manager.h"
+#include "Objects/WorldObjectManipulator.h"
 
 class GuiManager;
 
@@ -35,6 +36,13 @@ public:
 	GLuint tex;
 
 	World* world;
+
+	std::unique_ptr<WorldObjectManipulator> manipulator;
+
+private:
+	Vec3D CalculateRayDir(int mouseX, int mouseY);
+	bool IntersectRayPlane(const Vec3D& origin, const Vec3D& dir, const Vec3D& normal, float d, float& t);
+
 };
 
 

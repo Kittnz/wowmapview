@@ -8,6 +8,7 @@
 #include "world.h"
 
 class Test;
+class WorldObjectManipulator;
 
 class GuiManager {
 public:
@@ -25,8 +26,11 @@ public:
     bool showCameraInfo = true;
     bool showPerformance = true;
     bool showNodeControls = true;
+	bool showObjectManipulator = true;
 
     bool IsInitialized() const { return initialized; }
+
+    void RenderObjectManipulatorUI(WorldObjectManipulator* manipulator);
 
 private:
 

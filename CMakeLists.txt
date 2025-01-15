@@ -36,6 +36,7 @@ set(SOURCES
     database/QueryResult.cpp
     nodes.cpp
     objects/WorldObject.cpp
+    objects/WorldObjectManipulator.cpp
     gui_manager.cpp
 )
 
@@ -75,6 +76,7 @@ set(HEADERS
     defines/DBCFile.h
     nodes.h
     objects/WorldObject.h
+    objects/WorldObjectManipulator.h
     gui_manager.h
 )
 

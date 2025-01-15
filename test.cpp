@@ -34,10 +34,12 @@ Test::Test(World *w, float ah0, float av0): world(w), ah(ah0), av(av0), guiManag
 		return;
 	}
 
+	// Object manipulator
+	manipulator = std::make_unique<WorldObjectManipulator>(world);
+
+	// Initialize camera and movement
 	moving = strafing = updown = 0;
-
 	mousedir = -1.0f;
-
 	movespd = SPEED;
 
 	look = false;
@@ -176,7 +178,7 @@ void Test::display(float t, float dt)
 
 		glPopAttrib();
 
-		// Draw GUI last
+		// Draw GUI
 		guiManager.Render(world, this);
 	}
 }
@@ -422,28 +424,8 @@ void Test::keypressed(SDL_KeyboardEvent *e)
 	}
 }
 
-void Test::mousemove(SDL_MouseMotionEvent* e)
-{
-	// First, handle ImGui event handling
-	if (guiManager.HandleEvent((SDL_Event*)e) && ImGui::GetIO().WantCaptureMouse)
-		return;
-
-	// Only rotate camera when right mouse button is held down
-	if (look) {
-		// Relative mouse movement is used, so camera continues to rotate 
-		// even if mouse cursor leaves window boundaries
-		ah += e->xrel / XSENS;
-		av += mousedir * e->yrel / YSENS;
-
-		// Clamp vertical angle to prevent camera from flipping
-		if (av < -80) av = -80;
-		else if (av > 80) av = 80;
-	}
-}
-
 void Test::mouseclick(SDL_MouseButtonEvent* e)
 {
-	// First, handle ImGui event handling
 	if (guiManager.HandleEvent((SDL_Event*)e) && ImGui::GetIO().WantCaptureMouse)
 		return;
 
@@ -452,25 +434,130 @@ void Test::mouseclick(SDL_MouseButtonEvent* e)
 		case SDL_BUTTON_RIGHT:
 			// Enable camera rotation when right mouse button is pressed
 			look = true;
-			// Hide and capture mouse cursor
 			SDL_ShowCursor(SDL_DISABLE);
 			SDL_WM_GrabInput(SDL_GRAB_ON);
 			break;
+
 		case SDL_BUTTON_LEFT:
-			// Left mouse button can be used for selection or other interactions
-			// Implement selection logic here if needed
+			// Only handle left clicks if we're not in camera rotation mode
+			if (!look) {
+				// Calculate ray from camera through mouse point
+				GLint viewport[4];
+				GLdouble modelMatrix[16], projMatrix[16];
+				glGetIntegerv(GL_VIEWPORT, viewport);
+				glGetDoublev(GL_MODELVIEW_MATRIX, modelMatrix);
+				glGetDoublev(GL_PROJECTION_MATRIX, projMatrix);
+
+				Vec3D rayOrigin(world->camera);
+				Vec3D rayDir = CalculateRayDir(e->x, e->y);
+
+				// Handle object manipulation only if we're not in camera mode
+				switch (manipulator->GetMode()) {
+				case ManipulatorMode::Select:
+				case ManipulatorMode::Move:
+					manipulator->UpdateSelection(rayOrigin, rayDir);
+					if (manipulator->GetMode() == ManipulatorMode::Move) {
+						manipulator->StartDragging(e->x, e->y);
+					}
+					break;
+
+				case ManipulatorMode::Add:
+					// Calculate intersection with ground plane
+					float t;
+					if (IntersectRayPlane(rayOrigin, rayDir, Vec3D(0, 1, 0), 0, t)) {
+						Vec3D pos = rayOrigin + rayDir * t;
+						manipulator->AddNewObject(pos, SelectableType::TravelNode);
+					}
+					break;
+
+				case ManipulatorMode::Delete:
+					if (manipulator->HasSelection()) {
+						manipulator->DeleteSelected();
+					}
+					break;
+				}
+			}
+			break;
+
+		case SDL_BUTTON_MIDDLE:
+			// Handle vertical movement with middle mouse button
+			if (!look && manipulator->HasSelection() &&
+				manipulator->GetMode() == ManipulatorMode::Move) {
+				manipulator->StartDragging(e->x, e->y);
+				SDL_ShowCursor(SDL_DISABLE);
+				SDL_WM_GrabInput(SDL_GRAB_ON);
+			}
 			break;
 		}
 	}
 	else if (e->type == SDL_MOUSEBUTTONUP) {
 		switch (e->button) {
 		case SDL_BUTTON_RIGHT:
-			// Disable camera rotation when right mouse button is released
 			look = false;
-			// Show and release mouse cursor
 			SDL_ShowCursor(SDL_ENABLE);
 			SDL_WM_GrabInput(SDL_GRAB_OFF);
 			break;
+
+		case SDL_BUTTON_LEFT:
+		case SDL_BUTTON_MIDDLE:
+			if (!look) {
+				manipulator->StopDragging();
+				SDL_ShowCursor(SDL_ENABLE);
+				SDL_WM_GrabInput(SDL_GRAB_OFF);
+			}
+			break;
 		}
 	}
+}
+
+// Also modify mousemove to handle both camera and manipulation:
+void Test::mousemove(SDL_MouseMotionEvent* e)
+{
+	if (guiManager.HandleEvent((SDL_Event*)e) && ImGui::GetIO().WantCaptureMouse)
+		return;
+
+	if (look) {
+		// Handle camera rotation
+		ah += e->xrel / XSENS;
+		av += mousedir * e->yrel / YSENS;
+		if (av < -80) av = -80;
+		else if (av > 80) av = 80;
+	}
+	else {
+		// Handle object manipulation
+		manipulator->UpdateDragging(e->x, e->y);
+	}
+}
+
+Vec3D Test::CalculateRayDir(int mouseX, int mouseY)
+{
+	GLint viewport[4];
+	GLdouble modelMatrix[16], projMatrix[16];
+	glGetIntegerv(GL_VIEWPORT, viewport);
+	glGetDoublev(GL_MODELVIEW_MATRIX, modelMatrix);
+	glGetDoublev(GL_PROJECTION_MATRIX, projMatrix);
+
+	GLdouble winX = mouseX;
+	GLdouble winY = viewport[3] - mouseY;
+	GLdouble winZ = 0;
+
+	GLdouble posX, posY, posZ;
+	gluUnProject(winX, winY, winZ,
+		modelMatrix, projMatrix, viewport,
+		&posX, &posY, &posZ);
+
+	return Vec3D(posX - world->camera.x,
+		posY - world->camera.y,
+		posZ - world->camera.z).normalize();
+}
+
+bool Test::IntersectRayPlane(const Vec3D& origin, const Vec3D& dir,
+	const Vec3D& normal, float d, float& t)
+{
+	float denom = normal * dir;
+	if (fabs(denom) < 0.0001f)
+		return false;
+
+	t = -(normal * origin + d) / denom;
+	return t >= 0;
 }

@@ -1,6 +1,7 @@
 #include "gui_manager.h"
 #include "wowmapview.h"
 #include "Objects/WorldObject.h"
+#include "Objects/WorldObjectManipulator.h"
 #include "test.h"
 #include "areadb.h"
 
@@ -100,6 +101,8 @@ void GuiManager::Render(World* world, Test* test) {
         RenderPerformance();
     if (showNodeControls)
         RenderNodeControls(world);
+	if (showObjectManipulator)
+		RenderObjectManipulatorUI(test->manipulator.get());
 
     ImGui::Render();
 
@@ -165,6 +168,12 @@ void GuiManager::RenderMainControls(Test* test) {
         test->world->drawpathpoints = !test->world->drawpathpoints;
 
     ImGui::SliderFloat("Movement Speed", &test->movespd, 10.0f, 500.0f, "%.1f");
+
+    ImGui::SliderFloat("Highres Distance", &test->world->highresdistance, 384.0f, 1000.0f, "%.1f");
+    ImGui::SliderFloat("Map Distance", &test->world->mapdrawdistance, 998.0f, 2000.0f, "%.1f");
+    ImGui::SliderFloat("Model Distance", &test->world->modeldrawdistance, 384.0f, 1000.0f, "%.1f");
+    ImGui::SliderFloat("Doodad Distance", &test->world->doodaddrawdistance, 64.0f, 1000.0f, "%.1f");
+
     ImGui::SliderFloat("Fog Distance", &test->world->fogdistance, 357.0f, 777.0f, "%.1f");
 
     ImGui::End();
@@ -226,6 +235,52 @@ void GuiManager::RenderNodeControls(World* world) {
         }
     }
     ImGui::EndChild();
+
+    ImGui::End();
+}
+
+void GuiManager::RenderObjectManipulatorUI(WorldObjectManipulator* manipulator)
+{
+    if (!manipulator)
+        return;
+
+    ImGui::Begin("Object Manipulator");
+
+    float dragSpeed = manipulator->GetDragSpeed();
+    if (ImGui::SliderFloat("Drag Speed", &dragSpeed, 0.1f, 10.0f, "%.1f"))
+        manipulator->SetDragSpeed(dragSpeed);
+    ImGui::Separator();
+    if (ImGui::RadioButton("Select", manipulator->GetMode() == ManipulatorMode::Select))
+        manipulator->SetMode(ManipulatorMode::Select);
+    ImGui::SameLine();
+    if (ImGui::RadioButton("Move", manipulator->GetMode() == ManipulatorMode::Move))
+        manipulator->SetMode(ManipulatorMode::Move);
+    ImGui::SameLine();
+    if (ImGui::RadioButton("Add", manipulator->GetMode() == ManipulatorMode::Add))
+        manipulator->SetMode(ManipulatorMode::Add);
+    ImGui::SameLine();
+    if (ImGui::RadioButton("Delete", manipulator->GetMode() == ManipulatorMode::Delete))
+        manipulator->SetMode(ManipulatorMode::Delete);
+
+    if (const SelectableObject* selectedObject = manipulator->GetSelectedObject()) {
+        ImGui::Separator();
+        ImGui::Text("Selected: %s", selectedObject->name.c_str());
+
+        Position selectedPos = WorldObject::ConvertViewerCoordsToGameCoords(Position(selectedObject->position.x, selectedObject->position.y, selectedObject->position.z, 0.0f));
+        ImGui::Text("XYZ Coords: %.1f, %.1f, %.1f", selectedPos.x, selectedPos.y, selectedPos.z);
+        static char nameBuf[256];
+        if (ImGui::InputText("Name", nameBuf, sizeof(nameBuf),
+            ImGuiInputTextFlags_EnterReturnsTrue))
+        {
+            if (selectedObject->renameFunc) {
+                selectedObject->renameFunc(nameBuf);
+            }
+        }
+
+        if (ImGui::Button("Delete") && selectedObject->deleteFunc) {
+            selectedObject->deleteFunc();
+        }
+    }
 
     ImGui::End();
 }
