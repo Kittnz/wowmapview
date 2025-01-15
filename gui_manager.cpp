@@ -183,10 +183,10 @@ void GuiManager::RenderCameraMapInfo(World* world)
 {
     ImGui::Begin("Camera / Map", &showCameraInfo);
 
-    ImGui::Text("Camera Position: %.1f, %.1f, %.1f", world->camera.x, world->camera.y, world->camera.z);
+    ImGui::Text("Camera Viewer Position: %.1f, %.1f, %.1f", world->camera.x, world->camera.y, world->camera.z);
 
     Position gamePos = WorldObject::ConvertViewerCoordsToGameCoords(Position(world->camera.x, world->camera.y, world->camera.z, 0.0f));
-    ImGui::Text("XYZ Coords: %.1f, %.1f, %.1f", gamePos.x, gamePos.y, gamePos.z);
+    ImGui::Text("Game XYZ Coords: %.1f, %.1f, %.1f", gamePos.x, gamePos.y, gamePos.z);
 
     unsigned int areaID = world->getAreaID();
     unsigned int regionID = 0;
@@ -266,8 +266,10 @@ void GuiManager::RenderObjectManipulatorUI(WorldObjectManipulator* manipulator)
         ImGui::Separator();
         ImGui::Text("Selected: %s", selectedObject->name.c_str());
 
+        ImGui::Text("Viewer Coords: %.1f, %.1f, %.1f", selectedObject->position.x, selectedObject->position.y, selectedObject->position.z);
+
         Position selectedPos = WorldObject::ConvertViewerCoordsToGameCoords(Position(selectedObject->position.x, selectedObject->position.y, selectedObject->position.z, 0.0f));
-        ImGui::Text("XYZ Coords: %.1f, %.1f, %.1f", selectedPos.x, selectedPos.y, selectedPos.z);
+        ImGui::Text("Game XYZ Coords: %.1f, %.1f, %.1f", selectedPos.x, selectedPos.y, selectedPos.z);
         static char nameBuf[256];
         if (ImGui::InputText("Name", nameBuf, sizeof(nameBuf),
             ImGuiInputTextFlags_EnterReturnsTrue))
