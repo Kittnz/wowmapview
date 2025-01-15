@@ -71,6 +71,8 @@ public:
     void DrawNodeLabel(const TravelNode& node);
     void DrawAllNodeLabels(int mapId);
 
+    void DumpGLState(const char* label);
+
 private:
 
     struct LinkVertexData {

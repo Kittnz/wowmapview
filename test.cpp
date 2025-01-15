@@ -53,6 +53,10 @@ Test::Test(World *w, float ah0, float av0): world(w), ah(ah0), av(av0), guiManag
 	world->drawhighres = true;
 	world->drawfog = true; // should this be on or off by default..? :(
 
+	world->drawnodes = true;
+	world->drawpathpoints = true;
+	world->drawnodelabels = true;
+
 	// in the wow client, fog distance is stored in wtf\config.wtf as "farclip"
 	// minimum is 357, maximum is 777
 	world->fogdistance = 512.0f;
@@ -99,7 +103,8 @@ void Test::tick(float t, float dt)
 
 void Test::display(float t, float dt)
 {
-	if (mapmode && world->minimap) {
+	if (mapmode && world->minimap)
+	{
 		// Show minimap
 		video.clearScreen();
 		video.set2D();
@@ -130,7 +135,8 @@ void Test::display(float t, float dt)
 		glVertex2f(fx + 10.0f * cosf(ah / 180.0f * PI), fz + 10.0f * sinf(ah / 180.0f * PI));
 		glEnd();
 	}
-	else {
+	else
+	{
 		// Draw 3D world first
 		video.set3D();
 		world->draw();
@@ -147,43 +153,16 @@ void Test::display(float t, float dt)
 		glColor4f(1, 1, 1, 1);
 
 		// Draw HUD
-		if (hud) {
-			//f16->print(5, 0, "%.2f fps", gFPS);
-
-			unsigned int areaID = world->getAreaID();
-			unsigned int regionID = 0;
-			try {
-				AreaDB::Record rec = gAreaDB.getByAreaID(areaID);
-				std::string areaName = rec.getString(AreaDB::Name);
-				regionID = rec.getUInt(AreaDB::Region);
-				f16->print(5, 20, "%s", areaName.c_str());
-			}
-			catch (AreaDB::NotFound) {}
-
-			if (regionID != 0) {
-				try {
-					AreaDB::Record rec = gAreaDB.getByAreaID(regionID);
-					std::string regionName = rec.getString(AreaDB::Name);
-					f16->print(5, 40, "%s", regionName.c_str());
-				}
-				catch (AreaDB::NotFound) {}
-			}
-
+		if (hud)
+		{
 			int time = ((int)world->time) % 2880;
 			int hh = time / 120;
 			int mm = (time % 120) / 2;
 			f16->print(video.xres - 50, 0, "%02d:%02d", hh, mm);
-
-			f16->print(5, video.yres - 42, "Camera: (%.0f, %.0f, %.0f)",
-				world->camera.x, world->camera.y, world->camera.z);
-
-			Position cameraPos(world->camera.x, world->camera.y, world->camera.z, 0.0f);
-			Position xyzPos = WorldObject::ConvertViewerCoordsToGameCoords(cameraPos);
-			f16->print(5, video.yres - 22, "XYZ: (%.0f, %.0f, %.0f)",
-				xyzPos.x, xyzPos.y, xyzPos.z);
 		}
 
-		if (world->loading) {
+		if (world->loading)
+		{
 			const char* loadstr = "Loading...";
 			const char* oobstr = "Out of bounds";
 			f16->print(video.xres / 2 - f16->textwidth(loadstr) / 2, 0,
@@ -191,7 +170,7 @@ void Test::display(float t, float dt)
 		}
 
 		// Draw node labels
-		if (!mapmode) {
+		if (!mapmode && world->drawnodelabels == true) {
 			world->botNodes.DrawAllNodeLabels(world->currentMapId);
 		}
 
@@ -256,18 +235,6 @@ void Test::keypressed(SDL_KeyboardEvent *e)
 		// quit
 		if (e->keysym.sym == SDLK_ESCAPE) {
 		    gPop = true;
-		}
-
-		if (e->keysym.sym == SDLK_F11)
-		{
-			world->camera = Vec3D(-8949.95, -132.493, 83.5312);
-			tick(0, 0.001f);
-		}
-
-		if (e->keysym.sym == SDLK_F10)
-		{
-			world->camera = Vec3D(-8949.95, -132.493, 83.5312);
-			tick(0, 0.001f);
 		}
 
 		// Go to nearest node

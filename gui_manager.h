@@ -33,7 +33,7 @@ private:
     Test* test;
 
     void RenderMainControls(Test* test);
-    void RenderCameraInfo(World* world);
+    void RenderCameraMapInfo(World* world);
     void RenderPerformance();
     void RenderNodeControls(World* world);
 

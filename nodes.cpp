@@ -190,40 +190,70 @@ void WorldBotNodes::DrawSphere(const Vec3D& pos, float radius, const Vec4D& colo
 
 void WorldBotNodes::Draw(int mapId)
 {
-    // Save OpenGL state
+    //DumpGLState("Before Nodes Draw");
+
+    // Save complete GL state
     glPushAttrib(GL_ALL_ATTRIB_BITS);
     glPushMatrix();
 
-    // Setup state for 3D geometry
-    glEnable(GL_DEPTH_TEST);
-    glEnable(GL_BLEND);
-    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-    glDisable(GL_TEXTURE_2D);
-    glDisable(GL_FOG);
-
-    // Draw boxes and links
-    for (const auto& node : nodes)
+    // Draw nodes if enabled
+    if (gWorld->drawnodes)
     {
-        if (node.mapId != mapId)
-            continue;
+        // Setup states for nodes
+        glEnable(GL_BLEND);
+        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+        glEnable(GL_DEPTH_TEST);
+        glDepthMask(GL_TRUE);
+        glDisable(GL_TEXTURE_2D);
+        glDisable(GL_FOG);
+        glDisable(GL_LIGHTING);
 
-        float distanceToCamera = (node.position - gWorld->camera).length();
-        if (distanceToCamera > VIEW_DISTANCE)
-            continue;
+        for (const auto& node : nodes) {
+            if (node.mapId != mapId)
+                continue;
 
-        // Draw node box
-        Vec4D color = node.linked ?
-            Vec4D(0.0f, 1.0f, 0.0f, 0.7f) : // Green for linked
-            Vec4D(1.0f, 0.0f, 0.0f, 0.7f);  // Red for unlinked
+            float distanceToCamera = (node.position - gWorld->camera).length();
+            if (distanceToCamera > VIEW_DISTANCE)
+                continue;
 
-        DrawBox(node.position, DEFAULT_BOX_SIZE, color);
+            Vec4D color = node.linked ?
+                Vec4D(0.0f, 1.0f, 0.0f, 0.7f) :
+                Vec4D(1.0f, 0.0f, 0.0f, 0.7f);
+
+            DrawBox(node.position, DEFAULT_BOX_SIZE, color);
+        }
     }
 
-    DrawPathPoints(mapId);
-
-    // Restore state
-    glPopMatrix();
+    // Restore state before path points
     glPopAttrib();
+    glPopMatrix();
+
+    // Draw path points if enabled (with fresh GL state)
+    if (gWorld->drawpathpoints)
+    {
+        //DumpGLState("Before Path Points");
+
+        glPushAttrib(GL_ALL_ATTRIB_BITS);
+        glPushMatrix();
+
+        // Setup states for path points
+        glEnable(GL_BLEND);
+        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+        glEnable(GL_DEPTH_TEST);
+        glDepthMask(GL_TRUE);
+        glDisable(GL_TEXTURE_2D);
+        glDisable(GL_FOG);
+        glDisable(GL_LIGHTING);
+
+        DrawPathPoints(mapId);
+
+        glPopMatrix();
+        glPopAttrib();
+
+        //DumpGLState("After Path Points");
+    }
+
+    //DumpGLState("After Nodes Draw");
 }
 
 void WorldBotNodes::DrawBox(const Vec3D& pos, float size, const Vec4D& color)
@@ -583,25 +613,34 @@ void WorldBotNodes::DrawPathPoints(int mapId)
     if (pathPointVertices.empty())
         return;
 
-    glLineWidth(2.0f);  // Thicker lines for better visibility
+    // Save state
+    glPushAttrib(GL_ALL_ATTRIB_BITS);
+
+    // Setup rendering state
+    glEnable(GL_DEPTH_TEST);
+    glEnable(GL_BLEND);
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+    glLineWidth(2.0f);
 
     // Bind VBO and setup vertex pointers
     glBindBufferARB(GL_ARRAY_BUFFER_ARB, pathPointVBO);
     glEnableClientState(GL_VERTEX_ARRAY);
     glVertexPointer(3, GL_FLOAT, sizeof(PathPointVertex), 0);
-
-    // Enable color pointer
     glEnableClientState(GL_COLOR_ARRAY);
     glColorPointer(4, GL_FLOAT, sizeof(PathPointVertex), (void*)(3 * sizeof(float)));
 
-    // Draw all lines
+    // Draw without writing to depth buffer
+    glDepthMask(GL_FALSE);
     glDrawArrays(GL_LINES, 0, pathPointVertices.size());
 
     // Cleanup
     glDisableClientState(GL_COLOR_ARRAY);
     glDisableClientState(GL_VERTEX_ARRAY);
     glBindBufferARB(GL_ARRAY_BUFFER_ARB, 0);
-    glLineWidth(1.0f);  // Reset line width
+    glLineWidth(1.0f);
+
+    // Restore state
+    glPopAttrib();
 }
 
 void WorldBotNodes::DrawNodeLabel(const TravelNode& node)
@@ -763,4 +802,28 @@ bool WorldBotNodes::WorldToScreen(const Vec3D& worldPos, Vec2D& screenPos, bool&
     screenPos.x = -1000;
     screenPos.y = -1000;
     return false;
+}
+
+void WorldBotNodes::DumpGLState(const char* label) {
+    GLint depth_test, depth_mask, blend, blend_src, blend_dst;
+    GLint matrix_mode, viewport[4];
+    GLfloat depth_range[2];
+
+    glGetIntegerv(GL_DEPTH_TEST, &depth_test);
+    glGetIntegerv(GL_DEPTH_WRITEMASK, &depth_mask);
+    glGetIntegerv(GL_BLEND, &blend);
+    glGetIntegerv(GL_BLEND_SRC, &blend_src);
+    glGetIntegerv(GL_BLEND_DST, &blend_dst);
+    glGetIntegerv(GL_MATRIX_MODE, &matrix_mode);
+    glGetIntegerv(GL_VIEWPORT, viewport);
+    glGetFloatv(GL_DEPTH_RANGE, depth_range);
+
+    gLog("\nGL State Dump at %s:\n", label);
+    gLog("Depth Test: %d\n", depth_test);
+    gLog("Depth Mask: %d\n", depth_mask);
+    gLog("Blend: %d\n", blend);
+    gLog("Blend Func: src=%d dst=%d\n", blend_src, blend_dst);
+    gLog("Matrix Mode: %d\n", matrix_mode);
+    gLog("Viewport: %d,%d,%d,%d\n", viewport[0], viewport[1], viewport[2], viewport[3]);
+    gLog("Depth Range: %f,%f\n", depth_range[0], depth_range[1]);
 }

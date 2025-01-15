@@ -830,10 +830,15 @@ void World::draw()
 		}
 	}
 
-	// Draw node 3D geometry
+	// Save full state before drawing nodes
 	glPushAttrib(GL_ALL_ATTRIB_BITS);
-	glDisable(GL_FOG);  // Disable fog for node geometry
+	glPushMatrix();
+
+	// Draw node 3D geometry
 	botNodes.Draw(currentMapId);
+
+	// Restore state
+	glPopMatrix();
 	glPopAttrib();
 
 	glColor4f(1, 1, 1, 1);

@@ -2,6 +2,7 @@
 #include "wowmapview.h"
 #include "Objects/WorldObject.h"
 #include "test.h"
+#include "areadb.h"
 
 GuiManager::GuiManager(Test* testInstance) : test(testInstance) {}
 
@@ -94,7 +95,7 @@ void GuiManager::Render(World* world, Test* test) {
     if (showMainWindow)
         RenderMainControls(test);
     if (showCameraInfo)
-        RenderCameraInfo(world);
+        RenderCameraMapInfo(world);
     if (showPerformance)
         RenderPerformance();
     if (showNodeControls)
@@ -148,23 +149,56 @@ void GuiManager::RenderMainControls(Test* test) {
     if (ImGui::Button("Toggle Terrain"))
         test->world->drawterrain = !test->world->drawterrain;
 
-    // Fix SliderFloat calls - need min/max values
+    if (ImGui::Button("Toggle Doodads"))
+        test->world->drawdoodads = !test->world->drawdoodads;
+
+    if (ImGui::Button("Toggle WMO"))
+        test->world->drawwmo = !test->world->drawwmo;
+
+    if (ImGui::Button("Toggle Nodes"))
+        test->world->drawnodes = !test->world->drawnodes;
+
+    if (ImGui::Button("Toggle Node Labels"))
+        test->world->drawnodelabels = !test->world->drawnodelabels;
+
+    if (ImGui::Button("Toggle Node Path Points"))
+        test->world->drawpathpoints = !test->world->drawpathpoints;
+
     ImGui::SliderFloat("Movement Speed", &test->movespd, 10.0f, 500.0f, "%.1f");
     ImGui::SliderFloat("Fog Distance", &test->world->fogdistance, 357.0f, 777.0f, "%.1f");
 
     ImGui::End();
 }
 
-void GuiManager::RenderCameraInfo(World* world) {
-    ImGui::Begin("Camera", &showCameraInfo);
+void GuiManager::RenderCameraMapInfo(World* world)
+{
+    ImGui::Begin("Camera / Map", &showCameraInfo);
 
-    ImGui::Text("Position: %.1f, %.1f, %.1f",
-        world->camera.x, world->camera.y, world->camera.z);
+    ImGui::Text("Camera Position: %.1f, %.1f, %.1f", world->camera.x, world->camera.y, world->camera.z);
 
-    Position gamePos = WorldObject::ConvertViewerCoordsToGameCoords(
-        Position(world->camera.x, world->camera.y, world->camera.z, 0.0f));
-    ImGui::Text("Game Coords: %.1f, %.1f, %.1f",
-        gamePos.x, gamePos.y, gamePos.z);
+    Position gamePos = WorldObject::ConvertViewerCoordsToGameCoords(Position(world->camera.x, world->camera.y, world->camera.z, 0.0f));
+    ImGui::Text("XYZ Coords: %.1f, %.1f, %.1f", gamePos.x, gamePos.y, gamePos.z);
+
+    unsigned int areaID = world->getAreaID();
+    unsigned int regionID = 0;
+    try {
+        AreaDB::Record rec = gAreaDB.getByAreaID(areaID);
+        std::string areaName = rec.getString(AreaDB::Name);
+        regionID = rec.getUInt(AreaDB::Region);
+
+        ImGui::Text("Area: %s", areaName.c_str());
+    }
+    catch (AreaDB::NotFound) {}
+
+    if (regionID != 0) {
+        try {
+            AreaDB::Record rec = gAreaDB.getByAreaID(regionID);
+            std::string regionName = rec.getString(AreaDB::Name);
+
+            ImGui::Text("Region: %s", regionName.c_str());
+        }
+        catch (AreaDB::NotFound) {}
+    }
 
     ImGui::End();
 }

@@ -43,7 +43,7 @@ public:
 
     bool hadSky;
 
-	bool thirdperson,lighting,drawmodels,drawdoodads,drawterrain,drawwmo,loading,drawhighres,drawfog;
+	bool thirdperson, lighting, drawmodels, drawdoodads, drawterrain, drawwmo, loading, drawhighres, drawfog, drawnodes, drawpathpoints, drawnodelabels;
 	bool uselowlod;
 
 	GLuint detailtexcoords, alphatexcoords;
