@@ -58,6 +58,8 @@ public:
     float GetDragSpeed() const { return dragSpeedMultiplier; }
     void SetDragSpeed(float speed) { dragSpeedMultiplier = speed; }
 
+    void Draw();
+
 private:
     World* world;
     ManipulatorMode currentMode;

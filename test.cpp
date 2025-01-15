@@ -178,6 +178,11 @@ void Test::display(float t, float dt)
 
 		glPopAttrib();
 
+		// Draw object manipulator
+		if (manipulator) {
+			manipulator->Draw();
+		}
+
 		// Draw GUI
 		guiManager.Render(world, this);
 	}

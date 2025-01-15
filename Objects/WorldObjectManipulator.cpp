@@ -126,15 +126,17 @@ SelectableObject* WorldObjectManipulator::GetObjectAtPosition(const Vec3D& rayOr
 
         Vec3D closest = rayOrigin + rayDir * t;
         float dist = (closest - obj.position).length();
-        float selectionSize = (obj.type == SelectableType::TravelNode) ? 3.0f : 1.0f;
+
+        // Increase selection radius for path points
+        float selectionSize = (obj.type == SelectableType::PathPoint) ? 2.0f : 3.0f;
 
         if (dist < selectionSize && dist < closestDist) {
             closestDist = dist;
-            closestObj = &obj;  // Now the types match
+            closestObj = &obj;
         }
     }
 
-    return closestObj;  // Return closest object found
+    return closestObj;
 }
 
 void WorldObjectManipulator::StartDragging(float mouseX, float mouseY)
@@ -153,45 +155,68 @@ void WorldObjectManipulator::UpdateDragging(float mouseX, float mouseY)
     if (!isDragging || !selectedObject)
         return;
 
-    // Get key states and calculate final speed multiplier
-    Uint8* keystate = SDL_GetKeyState(NULL);
-    float speedMultiplier = dragSpeedMultiplier;
-    if (keystate[SDLK_LSHIFT] || keystate[SDLK_RSHIFT])
-        speedMultiplier *= 5.0f;
-    if (keystate[SDLK_LCTRL] || keystate[SDLK_RCTRL])
-        speedMultiplier *= 0.2f;
-
-    // Get the view and projection matrices
-    GLdouble modelMatrix[16], projMatrix[16];
+    // Get current view and projection matrices
     GLint viewport[4];
+    GLdouble modelMatrix[16], projMatrix[16];
+    glGetIntegerv(GL_VIEWPORT, viewport);
     glGetDoublev(GL_MODELVIEW_MATRIX, modelMatrix);
     glGetDoublev(GL_PROJECTION_MATRIX, projMatrix);
-    glGetIntegerv(GL_VIEWPORT, viewport);
 
-    // Calculate world space movement based on screen space delta
-    GLdouble startX, startY, startZ;
-    GLdouble endX, endY, endZ;
+    // Calculate ray direction from camera through mouse point
+    GLdouble nearX, nearY, nearZ;
+    GLdouble farX, farY, farZ;
 
-    gluUnProject(dragStartX, viewport[3] - dragStartY, 0.5,
-        modelMatrix, projMatrix, viewport,
-        &startX, &startY, &startZ);
+    gluUnProject(mouseX, viewport[3] - mouseY, 0.0, 
+        modelMatrix, projMatrix, viewport, 
+        &nearX, &nearY, &nearZ);
 
-    gluUnProject(mouseX, viewport[3] - mouseY, 0.5,
-        modelMatrix, projMatrix, viewport,
-        &endX, &endY, &endZ);
+    gluUnProject(mouseX, viewport[3] - mouseY, 1.0, 
+        modelMatrix, projMatrix, viewport, 
+        &farX, &farY, &farZ);
 
-    Vec3D delta((endX - startX) * speedMultiplier, 0, (endZ - startZ) * speedMultiplier);
+    Vec3D rayOrigin(nearX, nearY, nearZ);
+    Vec3D rayDir = Vec3D(farX - nearX, farY - nearY, farZ - nearZ).normalize();
 
-    // Handle vertical movement when Z key is pressed
-    if (keystate[SDLK_z]) {
-        float verticalDelta = (mouseY - dragStartY) * 0.1f * speedMultiplier;
-        delta.y = verticalDelta;
-    }
+    // Determine intersection plane
+    // Use a ground plane at the original object's Y height
+    Vec3D planeNormal(0, 1, 0);
+    float planeDistance = -dragStartPos.y;
 
-    selectedObject->position = dragStartPos + delta;
+    // Calculate intersection
+    float t;
+    Vec3D intersectionPoint;
+    
+    // Check if ray intersects plane
+    float denom = planeNormal * rayDir;
+    if (std::abs(denom) > 0.0001f) {
+        t = -(planeNormal * rayOrigin + planeDistance) / denom;
+        
+        // Ensure intersection point is in front of the camera
+        if (t >= 0) {
+            intersectionPoint = rayOrigin + rayDir * t;
 
-    if (selectedObject->moveFunc) {
-        selectedObject->moveFunc(selectedObject->position);
+            // Get key state for constraining movement
+            Uint8* keystate = SDL_GetKeyState(NULL);
+            bool constrainX = keystate[SDLK_x];
+            bool constrainZ = keystate[SDLK_z];
+            bool constrainY = keystate[SDLK_LCTRL];
+
+            // Update position with movement constraints
+            Vec3D newPos = selectedObject->position;
+            if (!constrainX) newPos.x = intersectionPoint.x;
+            if (!constrainZ) newPos.z = intersectionPoint.z;
+			if (!constrainY) newPos.y = intersectionPoint.y;
+
+            // Always keep original Y (ground plane height)
+            if (!constrainY)
+                newPos.y = dragStartPos.y;
+
+            selectedObject->position = newPos;
+
+            if (selectedObject->moveFunc) {
+                selectedObject->moveFunc(selectedObject->position);
+            }
+        }
     }
 }
 
@@ -225,8 +250,7 @@ void WorldObjectManipulator::AddNewObject(const Vec3D& position, SelectableType 
         // Add new node to database
         GameDb.ExecuteQueryInstant(
             "INSERT INTO ai_playerbot_travelnode (name, map_id, x, y, z, linked) "
-            "VALUES ('New Node', %u, %f, %f, %f, 0)",
-            world->currentMapId, gamePos.x, gamePos.y, gamePos.z);
+            "VALUES ('New Node', %u, %f, %f, %f, 0)",  world->currentMapId, gamePos.x, gamePos.y, gamePos.z);
 
         // Refresh nodes from database
         world->botNodes.LoadFromDB();
@@ -242,4 +266,51 @@ void WorldObjectManipulator::AddNewObject(const Vec3D& position, SelectableType 
 
     // Refresh selectable objects
     UpdateSelectableObjects();
+}
+
+void WorldObjectManipulator::Draw()
+{
+    if (!selectedObject)
+        return;
+
+    // Save OpenGL state
+    glPushAttrib(GL_ALL_ATTRIB_BITS);
+
+    // Setup state for 3D geometry
+    glEnable(GL_DEPTH_TEST);
+    glEnable(GL_BLEND);
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+    glDisable(GL_TEXTURE_2D);
+    glDisable(GL_LIGHTING);
+
+    // Draw highlight sphere for selected object
+    if (selectedObject->type == SelectableType::PathPoint) {
+        // Draw a slightly larger yellow sphere for selected path points
+        Vec4D highlightColor(1.0f, 1.0f, 0.0f, 0.7f); // Yellow with some transparency
+        float sphereRadius = 1.5f; // Make it noticeable but not too large
+
+        glColor4fv(highlightColor);
+
+        static const int segments = 12;
+        Vec3D pos = selectedObject->position;
+
+        // Draw three circles to form a sphere-like shape
+        for (int i = 0; i < 3; i++) {
+            glBegin(GL_LINE_LOOP);
+            for (int j = 0; j < segments; j++) {
+                float theta = 2.0f * PI * float(j) / float(segments);
+                float x = sphereRadius * cosf(theta);
+                float y = sphereRadius * sinf(theta);
+                switch (i) {
+                case 0: glVertex3f(pos.x + x, pos.y + y, pos.z); break;
+                case 1: glVertex3f(pos.x + x, pos.y, pos.z + y); break;
+                case 2: glVertex3f(pos.x, pos.y + x, pos.z + y); break;
+                }
+            }
+            glEnd();
+        }
+    }
+
+    // Restore state
+    glPopAttrib();
 }
