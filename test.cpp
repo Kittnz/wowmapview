@@ -21,7 +21,7 @@ using namespace std;
 // why the hell is this class called Test, anyway
 // I should rename it to MapViewer or something when I'm not lazy
 
-Test::Test(World *w, float ah0, float av0): world(w), ah(ah0), av(av0)
+Test::Test(World *w, float ah0, float av0): world(w), ah(ah0), av(av0), guiManager(this)
 {
 	// Initialize GUI
 	SDL_Surface* screen = SDL_GetVideoSurface();
@@ -148,7 +148,7 @@ void Test::display(float t, float dt)
 
 		// Draw HUD
 		if (hud) {
-			f16->print(5, 0, "%.2f fps", gFPS);
+			//f16->print(5, 0, "%.2f fps", gFPS);
 
 			unsigned int areaID = world->getAreaID();
 			unsigned int regionID = 0;
@@ -191,9 +191,9 @@ void Test::display(float t, float dt)
 		}
 
 		// Draw node labels
-		//if (!mapmode) {
+		if (!mapmode) {
 			world->botNodes.DrawAllNodeLabels(world->currentMapId);
-		//}
+		}
 
 		glPopAttrib();
 
@@ -455,30 +455,55 @@ void Test::keypressed(SDL_KeyboardEvent *e)
 	}
 }
 
-void Test::mousemove(SDL_MouseMotionEvent *e)
+void Test::mousemove(SDL_MouseMotionEvent* e)
 {
+	// First, handle ImGui event handling
 	if (guiManager.HandleEvent((SDL_Event*)e) && ImGui::GetIO().WantCaptureMouse)
 		return;
 
-	if (look || fullscreen) {
+	// Only rotate camera when right mouse button is held down
+	if (look) {
+		// Relative mouse movement is used, so camera continues to rotate 
+		// even if mouse cursor leaves window boundaries
 		ah += e->xrel / XSENS;
 		av += mousedir * e->yrel / YSENS;
+
+		// Clamp vertical angle to prevent camera from flipping
 		if (av < -80) av = -80;
 		else if (av > 80) av = 80;
 	}
-
 }
 
-void Test::mouseclick(SDL_MouseButtonEvent *e)
+void Test::mouseclick(SDL_MouseButtonEvent* e)
 {
+	// First, handle ImGui event handling
 	if (guiManager.HandleEvent((SDL_Event*)e) && ImGui::GetIO().WantCaptureMouse)
 		return;
 
 	if (e->type == SDL_MOUSEBUTTONDOWN) {
-		look = true;
-	} else if (e->type == SDL_MOUSEBUTTONUP) {
-		look = false;
+		switch (e->button) {
+		case SDL_BUTTON_RIGHT:
+			// Enable camera rotation when right mouse button is pressed
+			look = true;
+			// Hide and capture mouse cursor
+			SDL_ShowCursor(SDL_DISABLE);
+			SDL_WM_GrabInput(SDL_GRAB_ON);
+			break;
+		case SDL_BUTTON_LEFT:
+			// Left mouse button can be used for selection or other interactions
+			// Implement selection logic here if needed
+			break;
+		}
 	}
-
+	else if (e->type == SDL_MOUSEBUTTONUP) {
+		switch (e->button) {
+		case SDL_BUTTON_RIGHT:
+			// Disable camera rotation when right mouse button is released
+			look = false;
+			// Show and release mouse cursor
+			SDL_ShowCursor(SDL_ENABLE);
+			SDL_WM_GrabInput(SDL_GRAB_OFF);
+			break;
+		}
+	}
 }
-

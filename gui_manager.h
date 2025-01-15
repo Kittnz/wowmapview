@@ -11,7 +11,8 @@ class Test;
 
 class GuiManager {
 public:
-    GuiManager();
+    //GuiManager();
+    GuiManager(Test* testInstance);
     ~GuiManager();
 
     bool Init(SDL_Surface* screen);
@@ -28,6 +29,9 @@ public:
     bool IsInitialized() const { return initialized; }
 
 private:
+
+    Test* test;
+
     void RenderMainControls(Test* test);
     void RenderCameraInfo(World* world);
     void RenderPerformance();

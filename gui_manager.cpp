@@ -3,7 +3,7 @@
 #include "Objects/WorldObject.h"
 #include "test.h"
 
-GuiManager::GuiManager() {}
+GuiManager::GuiManager(Test* testInstance) : test(testInstance) {}
 
 GuiManager::~GuiManager() {
     Shutdown();
@@ -180,14 +180,14 @@ void GuiManager::RenderNodeControls(World* world) {
 
     if (ImGui::Button("Go to Nearest Node")) {
         // We need to modify Test class to expose this functionality
-        //&test->moveToNearestNode();
+        test->moveToNearestNode();
     }
 
     // Show node list
     if (ImGui::BeginChild("Nodes", ImVec2(0, 300), true)) {
         for (const auto& node : world->botNodes.nodes) {
             if (ImGui::Selectable(node.name.c_str())) {
-                //&test->moveToNode(node);
+                test->moveToNode(node);
             }
         }
     }
