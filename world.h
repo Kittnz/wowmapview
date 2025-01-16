@@ -15,11 +15,10 @@
 const float detail_size = 8.0f;
 
 class World {
-
+public:
 	MapTile *maptilecache[MAPTILECACHESIZE];
 	MapTile *current[3][3];
 	int ex,ez;
-public:
 
 	std::string basename;
 
@@ -88,6 +87,10 @@ public:
 	int currentMapId;
 	void setMapId(int mapId) { currentMapId = mapId; }
 	uint32 getMapId() const { return currentMapId; }
+
+	std::vector<Vec3D> roadPoints;
+	bool showRoadPoints = false;
+
 };
 
 

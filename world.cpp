@@ -794,6 +794,26 @@ void World::draw()
 	glBindBufferARB(GL_ARRAY_BUFFER_ARB, 0);
 	glEnable(GL_CULL_FACE);
 
+
+	if (showRoadPoints && !roadPoints.empty()) {
+		glDisable(GL_TEXTURE_2D);
+		glDisable(GL_LIGHTING);
+		glPointSize(5.0f);
+
+		glBegin(GL_POINTS);
+		glColor4f(1.0f, 1.0f, 0.0f, 1.0f); // Yellow points
+
+		for (const Vec3D& point : roadPoints) {
+			glVertex3f(point.x, point.y + 1.0f, point.z); // Offset slightly above ground
+		}
+
+		glEnd();
+
+		glPointSize(1.0f);
+		glEnable(GL_LIGHTING);
+		glEnable(GL_TEXTURE_2D);
+	}
+
 	glDisable(GL_BLEND);
 	glDisable(GL_ALPHA_TEST);
 

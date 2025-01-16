@@ -77,6 +77,14 @@ public:
 	void drawPass(int anim);
 	void drawWater();
 
+	bool hasRoadTexture() const;
+	bool isRoadTexture(int texIndex) const;
+	std::vector<Vec3D> getGroundPoints() const;
+	std::vector<Vec3D> points;
+	void debugPrintTextures() const;
+
+	bool hasSharpTextureTransition(int x, int z) const;
+
 };
 
 class MapTile {

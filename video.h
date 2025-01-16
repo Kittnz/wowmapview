@@ -42,6 +42,8 @@ extern PFNGLUNMAPBUFFERARBPROC glUnmapBufferARB;
 
 extern PFNGLDRAWRANGEELEMENTSPROC glDrawRangeElements;
 
+extern PFNGLGETBUFFERPARAMETERIVARBPROC glGetBufferParameterivARB;
+
 #define GL_BUFFER_OFFSET(i) ((char *)(0) + (i))
 
 extern bool supportCompression;

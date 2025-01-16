@@ -39,6 +39,8 @@ public:
 
 	std::unique_ptr<WorldObjectManipulator> manipulator;
 
+	void detectRoadPoints();
+
 private:
 	Vec3D CalculateRayDir(int mouseX, int mouseY);
 	bool IntersectRayPlane(const Vec3D& origin, const Vec3D& dir, const Vec3D& normal, float d, float& t);

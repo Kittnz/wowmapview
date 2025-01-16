@@ -3,6 +3,7 @@
 #include "vec3d.h"
 #include <cassert>
 #include <algorithm>
+#include <GL/gl.h>
 using namespace std;
 
 
@@ -42,19 +43,31 @@ MapTile::MapTile(int x0, int z0, char* filename): x(x0), z(z0), topnode(0,0,16)
 				f.seekRelative(8);
 			}
 		}
-		else if (!strcmp(fourcc,"MTEX")) {
+		else if (!strcmp(fourcc, "MTEX")) {
 			// texture lists
-			char *buf = new char[size];
+			char* buf = new char[size];
 			f.read(buf, size);
-			char *p=buf;
-			int t=0;
-			while (p<buf+size) {
+			char* p = buf;
+			int t = 0;
+
+			gLog("\nTextures loaded for tile %d,%d:\n", x0, z0);
+			gLog("----------------------------------------\n");
+
+			while (p < buf + size) {
 				string texpath(p);
-				p+=strlen(p)+1;
+				p += strlen(p) + 1;
 				fixname(texpath);
+
+				// Debug output
+				gLog("%d: %s\n", t++, texpath.c_str());
+
 				video.textures.add(texpath);
 				textures.push_back(texpath);
 			}
+
+			gLog("----------------------------------------\n");
+			gLog("Total textures: %d\n\n", t);
+
 			delete[] buf;
 		}
 		else if (!strcmp(fourcc,"MMDX")) {
@@ -115,6 +128,30 @@ MapTile::MapTile(int x0, int z0, char* filename): x(x0), z(z0), topnode(0,0,16)
 				WMOInstance inst(wmo, f);
 				wmois.push_back(inst);
 			}
+		}
+		else if (!strcmp(fourcc, "MTEX")) {
+			// texture lists - load these first
+			char* buf = new char[size];
+			f.read(buf, size);
+			char* p = buf;
+			int t = 0;
+
+			gLog("\nLoading textures for tile %d,%d:\n", x0, z0);
+			gLog("----------------------------------------\n");
+
+			while (p < buf + size) {
+				string texpath(p);
+				p += strlen(p) + 1;
+				fixname(texpath);
+
+				gLog("%d: %s\n", t++, texpath.c_str());
+
+				video.textures.add(texpath);
+				textures.push_back(texpath);
+			}
+
+			gLog("Total textures loaded: %zu\n", textures.size());
+			delete[] buf;
 		}
 
 		// MCNK data will be processed separately ^_^
@@ -377,9 +414,13 @@ void MapChunk::init(MapTile* mt, MPQFile &f)
 			r = (vmax - vmin).length() * 0.5f;
 
 		}
-		else if (!strcmp(fcc,"MCLY")) {
+		else if (!strcmp(fcc, "MCLY")) {
 			// texture info
 			nTextures = (int)size / 16;
+
+			//gLog("\nTexture layers for chunk at offset %d,%d:\n", px, py);
+			//gLog("----------------------------------------\n");
+
 			//gLog("=\n");
 			for (int i=0; i<nTextures; i++) {
 				int tex, flags;
@@ -802,6 +843,170 @@ void MapChunk::drawWater()
 		lq->draw();
 	}
 
+}
+
+bool MapChunk::hasRoadTexture() const
+{
+	for (int i = 0; i < nTextures; i++) {
+		if (isRoadTexture(i))
+			return true;
+	}
+	return false;
+}
+
+bool MapChunk::hasSharpTextureTransition(int x, int z) const {
+	// Skip if no alpha maps
+	if (nTextures <= 1 || !mt) return false;
+
+	// Convert chunk coordinates to alpha map coordinates (64x64)
+	int ax = (x * 64) / 17;  // Scale x from 0-16 to 0-63
+	int az = (z * 64) / 17;  // Scale z from 0-16 to 0-63
+
+	// First check if base texture is a road
+	bool hasRoad = isRoadTexture(0);
+	bool hasNonRoad = !hasRoad;
+
+	// Check each layer's alpha map at this point
+	for (int i = 0; i < nTextures - 1; i++) {
+		bool nextIsRoad = isRoadTexture(i + 1);
+
+		// If current layer and next layer are different types
+		if (nextIsRoad != hasRoad) {
+			// Consider this a transition point
+			hasRoad = true;
+			hasNonRoad = true;
+		}
+	}
+
+	return hasRoad && hasNonRoad;
+}
+
+std::vector<Vec3D> MapChunk::getGroundPoints() const {
+	std::vector<Vec3D> points;
+
+	// Make sure we have valid vertices
+	if (this->vertices == 0) {
+		gLog("Error: No vertex buffer exists\n");
+		return points;
+	}
+
+	// Bind the VBO
+	glBindBufferARB(GL_ARRAY_BUFFER_ARB, this->vertices);
+
+	// Get buffer size first
+	GLint bufferSize = 0;
+	glGetBufferParameterivARB(GL_ARRAY_BUFFER_ARB, GL_BUFFER_SIZE_ARB, &bufferSize);
+	if (bufferSize == 0) {
+		gLog("Error: Vertex buffer is empty\n");
+		glBindBufferARB(GL_ARRAY_BUFFER_ARB, 0);
+		return points;
+	}
+
+	// Map the buffer with error checking
+	void* rawData = glMapBufferARB(GL_ARRAY_BUFFER_ARB, GL_READ_ONLY_ARB);
+	if (!rawData) {
+		GLenum error = glGetError();
+		gLog("Error: Failed to map vertex buffer. GL Error: 0x%x\n", error);
+		glBindBufferARB(GL_ARRAY_BUFFER_ARB, 0);
+		return points;
+	}
+
+	float* floatData = (float*)rawData;
+
+	try {
+		// Sample points using reduced step size to avoid overwhelming memory
+		for (int j = 0; j < 17; j += 4) {  // Increased step size
+			for (int i = 0; i < 17; i += 4) {  // Increased step size
+				int idx = (j * 17 + i) * 3;
+
+				// Bounds check
+				if (idx + 2 >= bufferSize / sizeof(float)) {
+					continue;
+				}
+
+				Vec3D v(floatData[idx], floatData[idx + 1], floatData[idx + 2]);
+
+				// Only check points within height bounds
+				if (v.y >= this->vmin.y && v.y <= this->vmax.y) {
+					try {
+						if (this->hasSharpTextureTransition(i, j)) {
+							points.push_back(v);
+							gLog("Added road edge point at %f,%f,%f (clear texture with overlap)\n", v.x, v.y, v.z);
+						}
+					}
+					catch (const std::exception& e) {
+						gLog("Error checking texture transition: %s\n", e.what());
+						continue;
+					}
+				}
+			}
+		}
+	}
+	catch (const std::exception& e) {
+		gLog("Error while accessing vertex data: %s\n", e.what());
+	}
+
+	// Unmap buffer and cleanup
+	glUnmapBufferARB(GL_ARRAY_BUFFER_ARB);
+	glBindBufferARB(GL_ARRAY_BUFFER_ARB, 0);
+
+	gLog("Found %zu road edge points in chunk\n", points.size());
+	return points;
+}
+
+bool MapChunk::isRoadTexture(int texIndex) const {
+	if (!mt) {
+		gLog("Error: mt is null in isRoadTexture\n");
+		return false;
+	}
+
+	if (texIndex < 0 || texIndex >= nTextures) {
+		gLog("Error: texIndex %d out of range (nTextures=%d)\n", texIndex, nTextures);
+		return false;
+	}
+
+	// Find the original texture index in the MapTile's textures array
+	// We need to look up the texture in video.textures first
+	TextureID globalTexID = textures[texIndex];
+
+	// Search through mt->textures to find the matching texture name
+	for (size_t i = 0; i < mt->textures.size(); i++) {
+		if (video.textures.get(mt->textures[i]) == globalTexID) {
+			const std::string& texname = mt->textures[i];
+
+			// Convert to lowercase for case-insensitive comparison
+			std::string lower;
+			lower.resize(texname.size());
+			for (size_t i = 0; i < texname.size(); ++i) {
+				lower[i] = tolower(texname[i]);
+			}
+
+			// Check for rock, stone, cobble textures
+			bool isRoad = lower.find("rock") != std::string::npos ||
+				lower.find("stone") != std::string::npos ||
+				lower.find("cobble") != std::string::npos;
+
+			gLog("Checking texture %d: %s (isRoad: %d)\n",
+				texIndex, texname.c_str(), isRoad);
+
+			return isRoad;
+		}
+	}
+
+	gLog("Warning: Could not find texture name for index %d (globalID=%d)\n",
+		texIndex, globalTexID);
+	return false;
+}
+
+void MapChunk::debugPrintTextures() const {
+	for (int i = 0; i < nTextures; i++) {
+		TextureID tex = textures[i];
+		if (tex < mt->textures.size()) {
+			const std::string& texname = mt->textures[tex];
+			gLog("Texture %d: %s (isRoad: %d)\n",
+				i, texname.c_str(), isRoadTexture(i));
+		}
+	}
 }
 
 void MapNode::draw()

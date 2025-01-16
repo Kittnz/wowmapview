@@ -24,6 +24,8 @@ PFNGLUNMAPBUFFERARBPROC glUnmapBufferARB = NULL;
 
 PFNGLDRAWRANGEELEMENTSPROC glDrawRangeElements = NULL;
 
+PFNGLGETBUFFERPARAMETERIVARBPROC glGetBufferParameterivARB = NULL;
+
 bool supportCompression = false;
 bool supportMultiTex = false;
 bool supportVBO = false;
@@ -107,6 +109,7 @@ void Video::init(int xres, int yres, bool fullscreen)
 		glDeleteBuffersARB = (PFNGLDELETEBUFFERSARBPROC)SDL_GL_GetProcAddress("glDeleteBuffersARB");
 		glMapBufferARB = (PFNGLMAPBUFFERARBPROC)SDL_GL_GetProcAddress("glMapBufferARB");
 		glUnmapBufferARB = (PFNGLUNMAPBUFFERARBPROC)SDL_GL_GetProcAddress("glUnmapBufferARB");
+		glGetBufferParameterivARB = (PFNGLGETBUFFERPARAMETERIVARBPROC)SDL_GL_GetProcAddress("glGetBufferParameterivARB");
 	}
 
 	if (supportMultiTex) {

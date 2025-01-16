@@ -188,6 +188,45 @@ void Test::display(float t, float dt)
 	}
 }
 
+void Test::detectRoadPoints() {
+	world->roadPoints.clear();
+	int totalPoints = 0;
+	int chunksWithRoads = 0;
+
+	for (int j = 0; j < 3; j++) {
+		for (int i = 0; i < 3; i++) {
+			if (world->current[j][i]) {
+				MapTile* tile = world->current[j][i];
+				for (int z = 0; z < 16; z++) {
+					for (int x = 0; x < 16; x++) {
+						MapChunk* chunk = tile->getChunk(x, z);
+						if (chunk) {
+							// Debug output for this chunk
+							gLog("Checking chunk %d,%d:\n", x, z);
+							chunk->debugPrintTextures();
+
+							if (chunk->hasRoadTexture()) {
+								chunksWithRoads++;
+								auto points = chunk->getGroundPoints();
+								totalPoints += points.size();
+								world->roadPoints.insert(
+									world->roadPoints.end(),
+									points.begin(),
+									points.end()
+								);
+							}
+						}
+					}
+				}
+			}
+		}
+	}
+
+	world->showRoadPoints = true;
+	gLog("Found %d road points from %d chunks with roads\n",
+		world->roadPoints.size(), chunksWithRoads);
+}
+
 void Test::moveToNearestNode()
 {
 	if (world->botNodes.nodes.empty())
@@ -242,6 +281,10 @@ void Test::keypressed(SDL_KeyboardEvent *e)
 		// quit
 		if (e->keysym.sym == SDLK_ESCAPE) {
 		    gPop = true;
+		}
+
+		if (e->keysym.sym == SDLK_k) {
+			detectRoadPoints();
 		}
 
 		// Go to nearest node
