@@ -73,15 +73,25 @@ void ImGui_ImplSDL1_Shutdown()
 void ImGui_ImplSDL1_NewFrame()
 {
     ImGui_ImplSDL1_Data* bd = ImGui_ImplSDL1_GetBackendData();
+    IM_ASSERT(bd != nullptr && "Did you call ImGui_ImplSDL1_Init()?");
     ImGuiIO& io = ImGui::GetIO();
 
     // Setup display size
     SDL_Surface* surface = SDL_GetVideoSurface();
     io.DisplaySize = ImVec2((float)surface->w, (float)surface->h);
 
-    // Setup time step
+    // Setup time step (we don't use SDL_GetTicks() directly as it may be unsynchronized with our game loop)
+    static Uint32 frequency = SDL_GetTicks();
     Uint32 current_time = SDL_GetTicks();
-    io.DeltaTime = bd->Time > 0 ? (float)((double)(current_time - bd->Time) / 1000.0) : (float)(1.0f / 60.0f);
+
+    if (bd->Time > 0)
+        io.DeltaTime = (float)(current_time - bd->Time) / 1000.0f;
+    else
+        io.DeltaTime = 1.0f / 60.0f;
+
+    if (io.DeltaTime <= 0.0f)
+        io.DeltaTime = 1.0f / 60.0f;
+
     bd->Time = current_time;
 
     // Update mouse position and buttons

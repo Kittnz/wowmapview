@@ -90,7 +90,14 @@ void GuiManager::Render(World* world, Test* test) {
     // Start ImGui frame
     ImGui_ImplOpenGL2_NewFrame();
     ImGui_ImplSDL1_NewFrame();
-    ImGui::NewFrame();
+
+    try {
+        ImGui::NewFrame();
+    }
+    catch (...) {
+        gLog("Error in ImGui::NewFrame()\n");
+        return;
+    }
 
     // Render GUI elements
     if (showMainWindow)
@@ -246,9 +253,6 @@ void GuiManager::RenderObjectManipulatorUI(WorldObjectManipulator* manipulator)
 
     ImGui::Begin("Object Manipulator");
 
-    float dragSpeed = manipulator->GetDragSpeed();
-    if (ImGui::SliderFloat("Drag Speed", &dragSpeed, 0.1f, 10.0f, "%.1f"))
-        manipulator->SetDragSpeed(dragSpeed);
     ImGui::Separator();
     if (ImGui::RadioButton("Select", manipulator->GetMode() == ManipulatorMode::Select))
         manipulator->SetMode(ManipulatorMode::Select);

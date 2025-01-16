@@ -54,10 +54,6 @@ public:
     void StopDragging();
     void DeleteSelected();
     void AddNewObject(const Vec3D& position, SelectableType type);
-
-    float GetDragSpeed() const { return dragSpeedMultiplier; }
-    void SetDragSpeed(float speed) { dragSpeedMultiplier = speed; }
-
     void Draw();
 
 private:
@@ -74,7 +70,6 @@ private:
     void RegisterTravelNodes();
     void RegisterPathPoints();
     SelectableObject* GetObjectAtPosition(const Vec3D& rayOrigin, const Vec3D& rayDir);
-    float dragSpeedMultiplier = 5.0f;
 };
 
 #endif
