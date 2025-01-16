@@ -155,6 +155,10 @@ void WorldObjectManipulator::UpdateDragging(float mouseX, float mouseY)
     if (!isDragging || !selectedObject)
         return;
 
+    // Get key state for Y-axis movement
+    Uint8* keystate = SDL_GetKeyState(NULL);
+    bool allowYMovement = keystate[SDLK_LCTRL];
+
     // Get current view and projection matrices
     GLint viewport[4];
     GLdouble modelMatrix[16], projMatrix[16];
@@ -165,54 +169,45 @@ void WorldObjectManipulator::UpdateDragging(float mouseX, float mouseY)
     // Calculate ray direction from camera through mouse point
     GLdouble nearX, nearY, nearZ;
     GLdouble farX, farY, farZ;
-
-    gluUnProject(mouseX, viewport[3] - mouseY, 0.0, 
-        modelMatrix, projMatrix, viewport, 
+    gluUnProject(mouseX, viewport[3] - mouseY, 0.0,
+        modelMatrix, projMatrix, viewport,
         &nearX, &nearY, &nearZ);
-
-    gluUnProject(mouseX, viewport[3] - mouseY, 1.0, 
-        modelMatrix, projMatrix, viewport, 
+    gluUnProject(mouseX, viewport[3] - mouseY, 1.0,
+        modelMatrix, projMatrix, viewport,
         &farX, &farY, &farZ);
 
     Vec3D rayOrigin(nearX, nearY, nearZ);
     Vec3D rayDir = Vec3D(farX - nearX, farY - nearY, farZ - nearZ).normalize();
 
-    // Determine intersection plane
-    // Use a ground plane at the original object's Y height
-    Vec3D planeNormal(0, 1, 0);
-    float planeDistance = -dragStartPos.y;
+    // Use different intersection planes based on CTRL state
+    Vec3D planeNormal;
+    float planeDistance;
+
+    if (allowYMovement) {
+        // Use camera-facing plane when CTRL is held
+        planeNormal = (rayOrigin - dragStartPos).normalize();
+        planeDistance = -(planeNormal * dragStartPos);
+    }
+    else {
+        // Use ground plane when CTRL is not held
+        planeNormal = Vec3D(0, 1, 0);
+        planeDistance = -dragStartPos.y;
+    }
 
     // Calculate intersection
-    float t;
-    Vec3D intersectionPoint;
-    
-    // Check if ray intersects plane
     float denom = planeNormal * rayDir;
     if (std::abs(denom) > 0.0001f) {
-        t = -(planeNormal * rayOrigin + planeDistance) / denom;
-        
-        // Ensure intersection point is in front of the camera
+        float t = -(planeNormal * rayOrigin + planeDistance) / denom;
         if (t >= 0) {
-            intersectionPoint = rayOrigin + rayDir * t;
+            Vec3D intersectionPoint = rayOrigin + rayDir * t;
+            Vec3D newPos = intersectionPoint;
 
-            // Get key state for constraining movement
-            Uint8* keystate = SDL_GetKeyState(NULL);
-            bool constrainX = keystate[SDLK_x];
-            bool constrainZ = keystate[SDLK_z];
-            bool constrainY = keystate[SDLK_LCTRL];
-
-            // Update position with movement constraints
-            Vec3D newPos = selectedObject->position;
-            if (!constrainX) newPos.x = intersectionPoint.x;
-            if (!constrainZ) newPos.z = intersectionPoint.z;
-			if (!constrainY) newPos.y = intersectionPoint.y;
-
-            // Always keep original Y (ground plane height)
-            if (!constrainY)
+            if (!allowYMovement) {
+                // Keep original Y height when not holding CTRL
                 newPos.y = dragStartPos.y;
+            }
 
             selectedObject->position = newPos;
-
             if (selectedObject->moveFunc) {
                 selectedObject->moveFunc(selectedObject->position);
             }

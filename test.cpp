@@ -437,11 +437,13 @@ void Test::mouseclick(SDL_MouseButtonEvent* e)
 	if (e->type == SDL_MOUSEBUTTONDOWN) {
 		switch (e->button) {
 		case SDL_BUTTON_RIGHT:
-			// Enable camera rotation when right mouse button is pressed
+		{
 			look = true;
+			// Hide and capture mouse cursor
 			SDL_ShowCursor(SDL_DISABLE);
 			SDL_WM_GrabInput(SDL_GRAB_ON);
 			break;
+		}
 
 		case SDL_BUTTON_LEFT:
 			// Only handle left clicks if we're not in camera rotation mode
@@ -483,32 +485,27 @@ void Test::mouseclick(SDL_MouseButtonEvent* e)
 				}
 			}
 			break;
-
-		case SDL_BUTTON_MIDDLE:
-			// Handle vertical movement with middle mouse button
-			if (!look && manipulator->HasSelection() &&
-				manipulator->GetMode() == ManipulatorMode::Move) {
-				manipulator->StartDragging(e->x, e->y);
-				SDL_ShowCursor(SDL_DISABLE);
-				SDL_WM_GrabInput(SDL_GRAB_ON);
+		}
+	}
+	else if (e->type == SDL_MOUSEBUTTONUP)
+	{
+		switch (e->button) {
+		case SDL_BUTTON_RIGHT:
+		{
+			// Only disable camera look if not holding CTRL
+			Uint8* keystate = SDL_GetKeyState(NULL);
+			if (!keystate[SDLK_LCTRL]) {
+				look = false;
+				// Show and release mouse cursor
+				SDL_ShowCursor(SDL_ENABLE);
+				SDL_WM_GrabInput(SDL_GRAB_OFF);
 			}
 			break;
 		}
-	}
-	else if (e->type == SDL_MOUSEBUTTONUP) {
-		switch (e->button) {
-		case SDL_BUTTON_RIGHT:
-			look = false;
-			SDL_ShowCursor(SDL_ENABLE);
-			SDL_WM_GrabInput(SDL_GRAB_OFF);
-			break;
 
 		case SDL_BUTTON_LEFT:
-		case SDL_BUTTON_MIDDLE:
 			if (!look) {
 				manipulator->StopDragging();
-				SDL_ShowCursor(SDL_ENABLE);
-				SDL_WM_GrabInput(SDL_GRAB_OFF);
 			}
 			break;
 		}
@@ -520,6 +517,8 @@ void Test::mousemove(SDL_MouseMotionEvent* e)
 {
 	if (guiManager.HandleEvent((SDL_Event*)e) && ImGui::GetIO().WantCaptureMouse)
 		return;
+
+	Uint8* keystate = SDL_GetKeyState(NULL);
 
 	if (look) {
 		// Handle camera rotation
