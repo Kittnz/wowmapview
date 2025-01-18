@@ -121,7 +121,7 @@ int main(int argc, char *argv[])
     int xres = 1920;
     int yres = 1200;
 
-    bool usePatch = false;
+    bool usePatch = true;
 
     const char *override_game_path = NULL;
     int maxFps = 60;
@@ -204,28 +204,58 @@ int main(int argc, char *argv[])
 
         if (usePatch) {
             // patch goes first -> fake priority handling
+
             sprintf(path, "%s%s", gamePath.c_str(), "patch.MPQ");
-            archives.push_back(new MPQArchive(path));
+            MPQArchive* archive = new MPQArchive(path);
+            if (archive) {
+                archive->ListFiles();
+                archives.push_back(archive);
+            }
 
             sprintf(path, "%s%s", gamePath.c_str(), "enUS\\Patch-enUS.MPQ");
-            archives.push_back(new MPQArchive(path));
+            archive = new MPQArchive(path);
+            if (archive) {
+                archive->ListFiles();
+                archives.push_back(archive);
+            }
+
             sprintf(path, "%s%s", gamePath.c_str(), "enUS\\Patch-enUS-2.MPQ");
-            archives.push_back(new MPQArchive(path));
+            archive = new MPQArchive(path);
+            if (archive) {
+                archive->ListFiles();
+                archives.push_back(archive);
+            }
 
-            sprintf(path, "%s%s", gamePath.c_str(), "enGB\\Patch-enGB.MPQ");
-            archives.push_back(new MPQArchive(path));
+            sprintf(path, "%s%s", gamePath.c_str(), "enUS\\Patch-enGB.MPQ");
+            archive = new MPQArchive(path);
+            if (archive) {
+                archive->ListFiles();
+                archives.push_back(archive);
+            }
 
-            sprintf(path, "%s%s", gamePath.c_str(), "deDE\\Patch-deDE.MPQ");
-            archives.push_back(new MPQArchive(path));
+            sprintf(path, "%s%s", gamePath.c_str(), "enUS\\Patch-deDE.MPQ");
+            archive = new MPQArchive(path);
+            if (archive) {
+                archive->ListFiles();
+                archives.push_back(archive);
+            }
 
-            sprintf(path, "%s%s", gamePath.c_str(), "frFR\\Patch-frFR.MPQ");
-            archives.push_back(new MPQArchive(path));
+            sprintf(path, "%s%s", gamePath.c_str(), "enUS\\Patch-frFR.MPQ");
+            archive = new MPQArchive(path);
+            if (archive) {
+                archive->ListFiles();
+                archives.push_back(archive);
+            }
         }
 
-        for (size_t i=0; i<10; i++) {
+        for (size_t i = 0; i < 10; i++) {
             gLog("Trying to open mpq %s \n", archiveNames[i]);
             sprintf(path, "%s%s", gamePath.c_str(), archiveNames[i]);
-            archives.push_back(new MPQArchive(path));
+            MPQArchive* archive = new MPQArchive(path);
+            if (archive) {
+                archive->ListFiles();
+                archives.push_back(archive);
+            }
         }
     }
     else

@@ -1,5 +1,6 @@
 /*
- * This file is part of the Continued-MaNGOS Project
+ * Copyright (C) 2005-2011 MaNGOS <http://getmangos.com/>
+ * Copyright (C) 2009-2011 MaNGOSZero <https://github.com/mangos/zero>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -16,13 +17,10 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
-#define _CRT_SECURE_NO_DEPRECATE
-#define _CRT_SECURE_NO_WARNINGS
-
 #ifndef MPQ_H
 #define MPQ_H
 
-#include "loadlib.h"
+#include "loadlib/loadlib.h"
 #include "libmpq/mpq.h"
 #include <string.h>
 #include <ctype.h>
@@ -40,13 +38,14 @@ class MPQArchive
 
         MPQArchive(const char* filename);
         void close();
+        void ListFiles();
 
         void GetFileListTo(vector<string>& filelist)
         {
             uint32 filenum;
             if (libmpq__file_number(mpq_a, "(listfile)", &filenum)) return;
             libmpq__off_t size, transferred;
-            libmpq__file_unpacked_size(mpq_a, filenum, &size);
+            libmpq__file_size_unpacked(mpq_a, filenum, &size);
 
             char* buffer = new char[size];
 

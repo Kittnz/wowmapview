@@ -38,6 +38,9 @@ set(SOURCES
     objects/WorldObject.cpp
     objects/WorldObjectManipulator.cpp
     gui_manager.cpp
+    loadlib/loadlib.cpp 
+    loadlib/adt.cpp
+    loadlib/wdt.cpp
 )
 
 set(HEADERS
@@ -78,6 +81,9 @@ set(HEADERS
     objects/WorldObject.h
     objects/WorldObjectManipulator.h
     gui_manager.h
+    loadlib/loadlib.h 
+    loadlib/adt.h
+    loadlib/wdt.h
 )
 
 # Platform-specific settings

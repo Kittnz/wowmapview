@@ -88,6 +88,7 @@ public:
 	int currentMapId;
 	void setMapId(int mapId) { currentMapId = mapId; }
 	uint32 getMapId() const { return currentMapId; }
+	void normalizeFilePath(char* path);
 };
 
 

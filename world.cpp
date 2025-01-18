@@ -90,10 +90,44 @@ void World::init()
 	if (nMaps) initMinimap();
 }
 
-
 void World::initMinimap()
 {
-	glGenTextures(1, &minimap);
+	// Clear any previous minimap texture
+	if (minimap) {
+		glDeleteTextures(1, &minimap);
+		minimap = 0;
+	}
+
+	char fn[256];
+	sprintf(fn, "World\\Maps\\%s\\%s.wdl", basename.c_str(), basename.c_str());
+
+	MPQFile f(fn);
+	if (f.isEof()) {
+		// No minimap file exists
+		gLog("No minimap found for %s\n", basename.c_str());
+		return;
+	}
+
+	f.seek(0x14);
+	int ofsbuf[64][64];
+	f.read(ofsbuf, 64 * 64 * 4);
+
+	bool hasData = false;
+	for (int j = 0; j < 64; j++) {
+		for (int i = 0; i < 64; i++) {
+			if (ofsbuf[j][i]) {
+				hasData = true;
+				break;
+			}
+		}
+		if (hasData) break;
+	}
+
+	if (!hasData) {
+		gLog("No minimap data found for %s\n", basename.c_str());
+		f.close();
+		return;
+	}
 
 	// zomg, data on the stack!!1
 	//int texbuf[512][512];
@@ -103,12 +137,6 @@ void World::initMinimap()
 	// as alpha is unused, maybe I should try 24bpp? :(
 	short tilebuf[17*17];
 
-	int ofsbuf[64][64];
-
-	char fn[256];
-	sprintf(fn,"World\\Maps\\%s\\%s.wdl", basename.c_str(), basename.c_str());
-
-	MPQFile f(fn);
 	f.seek(0x14);
 	f.read(ofsbuf,64*64*4);
 
@@ -221,18 +249,55 @@ void World::initMinimap()
 	f.close();
 }
 
-
 void World::initLowresTerrain()
 {
+	// Clear any existing lowres tiles
+	for (int j = 0; j < 64; j++) {
+		for (int i = 0; i < 64; i++) {
+			if (lowrestiles[j][i] != 0) {
+				glDeleteLists(lowrestiles[j][i], 1);
+				lowrestiles[j][i] = 0;
+			}
+		}
+	}
+
 	char fn[256];
-	sprintf(fn,"World\\Maps\\%s\\%s.wdl", basename.c_str(), basename.c_str());
+	sprintf(fn, "World\\Maps\\%s\\%s.wdl", basename.c_str(), basename.c_str());
+
+	MPQFile f(fn);
+	if (f.isEof()) {
+		// No terrain file exists
+		gLog("No lowres terrain found for %s\n", basename.c_str());
+		return;
+	}
+
+	f.seek(0x14);
+	int ofsbuf[64][64];
+	f.read(ofsbuf, 64 * 64 * 4);
+
+	// Check if there's any terrain data
+	bool hasData = false;
+	for (int j = 0; j < 64; j++) {
+		for (int i = 0; i < 64; i++) {
+			if (ofsbuf[j][i]) {
+				hasData = true;
+				break;
+			}
+		}
+		if (hasData) break;
+	}
+
+	if (!hasData) {
+		gLog("No lowres terrain data found for %s\n", basename.c_str());
+		f.close();
+		return;
+	}
+
 	short tilebuf[17*17];
 	short tilebuf2[16*16];
 	Vec3D lowres[17][17];
 	Vec3D lowsub[16][16];
-	int ofsbuf[64][64];
 
-	MPQFile f(fn);
 	f.seek(0x14);
 	f.read(ofsbuf,64*64*4);
 
@@ -254,24 +319,15 @@ void World::initLowresTerrain()
 					}
 				}
 
-				GLuint dl;
-				dl = glGenLists(1);
-				glNewList(dl, GL_COMPILE);
-				/*
-				// draw tiles 16x16?
-				glBegin(GL_TRIANGLE_STRIP);
-				for (int y=0; y<16; y++) {
-					// end jump
-					if (y>0) glVertex3fv(lowres[y][0]);
-					for (int x=0; x<17; x++) {
-                        glVertex3fv(lowres[y][x]);
-                        glVertex3fv(lowres[y+1][x]);
-					}
-                    // start jump
-					if (y<15) glVertex3fv(lowres[y+1][16]);
+				// Generate display list
+				GLuint dl = glGenLists(1);
+				if (dl == 0) {
+					gLog("Failed to create display list for tile %d,%d\n", i, j);
+					continue;
 				}
-				glEnd();
-				*/
+
+				glNewList(dl, GL_COMPILE);
+
 				// draw tiles 17*17+16*16
 				glBegin(GL_TRIANGLES);
 				for (int y=0; y<16; y++) {
@@ -288,6 +344,7 @@ void World::initLowresTerrain()
 			}
 		}
 	}
+	f.close();
 }
 
 GLuint gdetailtexcoords=0, galphatexcoords=0;
@@ -383,7 +440,7 @@ void World::initDisplay()
 
 	ol = new OutdoorLighting("World\\dnc.db");
 
-	initLowresTerrain();
+	//initLowresTerrain();
 
     botNodes.LoadNodeModel();
     botNodes.LoadFromDB();
@@ -891,4 +948,10 @@ unsigned int World::getAreaID()
 	if(curChunk == 0) return 0;
 
 	return curChunk->areaID;
+}
+
+void World::normalizeFilePath(char* path) {
+	for (char* p = path; *p; ++p) {
+		if (*p == '\\') *p = '/';
+	}
 }
