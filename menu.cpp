@@ -4,6 +4,7 @@
 #include "dbcfile.h"
 
 #include <fstream>
+#include <sstream>
 
 using namespace std;
 
@@ -317,14 +318,13 @@ void Menu::display(float t, float dt)
 
 		}
 
-		for (unsigned int i=0; i<maps.size(); i++) {
-			if (i==sel) glColor4f(0,1,1,1);
-			else glColor4f(1,1,1,1);
+		for (unsigned int i = 0; i < maps.size(); i++) {
+			if (i == sel) glColor4f(0, 1, 1, 1);
+			else glColor4f(1, 1, 1, 1);
 
-			//f16->print(0, i*16, maps[i].name.c_str());
-
-			maps[i].font->shprint(maps[i].x0, maps[i].y0, maps[i].name.c_str());
-
+			std::stringstream ss;
+			ss << maps[i].mapId << " - " << maps[i].name;
+			maps[i].font->shprint(maps[i].x0, maps[i].y0, ss.str().c_str());
 		}
 
 		glColor4f(1,1,1,1);
