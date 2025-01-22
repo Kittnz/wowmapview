@@ -24,7 +24,7 @@ ArchiveSet gOpenArchives;
 
 MPQArchive::MPQArchive(const char* filename)
 {
-    int result = libmpq__archive_open(&mpq_a, filename, 0);
+    int result = libmpq__archive_open(&mpq_a, filename, -1);
     printf("Opening %s\n", filename);
     if (result)
     {
@@ -118,20 +118,36 @@ MPQFile::MPQFile(const char* filename):
 
 size_t MPQFile::read(void* dest, size_t bytes)
 {
-    if (eof) return 0;
-
-    libmpq__off_t rpos = static_cast <libmpq__off_t> (pointer + bytes);
-    if (rpos > size)
-    {
-        bytes = size - pointer;
-        eof = true;
+    // Validate inputs and state
+    if (eof || !dest || !buffer || bytes == 0) {
+        return 0;
     }
 
-    memcpy(dest, &(buffer[pointer]), bytes);
+    // Validate pointer is within bounds
+    if (pointer >= size) {
+        eof = true;
+        return 0;
+    }
 
-    pointer = rpos;
+    // Calculate remaining bytes and validate read size
+    size_t remaining = size - pointer;
+    size_t bytesToRead = std::min(bytes, remaining);
 
-    return bytes;
+    // Bounds check the read operation
+    try {
+        memcpy(dest, &(buffer[pointer]), bytesToRead);
+        pointer += bytesToRead;
+
+        if (pointer >= size) {
+            eof = true;
+        }
+
+        return bytesToRead;
+    }
+    catch (...) {
+        eof = true;
+        return 0;
+    }
 }
 
 void MPQFile::seek(int offset)

@@ -25,7 +25,6 @@ class Liquid {
 	void initTextures(char *basename, int first, int last);
 
 	int type;
-	std::vector<GLuint> textures;
 	Vec3D col;
 	int tmpflag;
 	bool trans;
@@ -46,6 +45,7 @@ public:
 
 	void draw();
 
+	std::vector<GLuint> textures;
 
 };
 

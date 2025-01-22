@@ -93,10 +93,11 @@ void World::init()
 void World::initMinimap()
 {
 	// Clear any previous minimap texture
-	if (minimap) {
+	glDeleteTextures(1, &minimap);
+	/*if (minimap) {
 		glDeleteTextures(1, &minimap);
 		minimap = 0;
-	}
+	}*/
 
 	char fn[256];
 	sprintf(fn, "World\\Maps\\%s\\%s.wdl", basename.c_str(), basename.c_str());
@@ -108,7 +109,7 @@ void World::initMinimap()
 		return;
 	}
 
-	f.seek(0x14);
+	/*f.seek(0x14);
 	int ofsbuf[64][64];
 	f.read(ofsbuf, 64 * 64 * 4);
 
@@ -127,7 +128,7 @@ void World::initMinimap()
 		gLog("No minimap data found for %s\n", basename.c_str());
 		f.close();
 		return;
-	}
+	}*/
 
 	// zomg, data on the stack!!1
 	//int texbuf[512][512];
@@ -137,6 +138,7 @@ void World::initMinimap()
 	// as alpha is unused, maybe I should try 24bpp? :(
 	short tilebuf[17*17];
 
+	int ofsbuf[64][64];
 	f.seek(0x14);
 	f.read(ofsbuf,64*64*4);
 
@@ -319,8 +321,25 @@ void World::initLowresTerrain()
 					}
 				}
 
+				GLuint dl;
+				dl = glGenLists(1);
+
+				/*
+				// draw tiles 16x16?
+				glBegin(GL_TRIANGLE_STRIP);
+				for (int y=0; y<16; y++) {
+					// end jump
+					if (y>0) glVertex3fv(lowres[y][0]);
+					for (int x=0; x<17; x++) {
+						glVertex3fv(lowres[y][x]);
+						glVertex3fv(lowres[y+1][x]);
+					}
+					// start jump
+					if (y<15) glVertex3fv(lowres[y+1][16]);
+				glEnd();
+				*/
+
 				// Generate display list
-				GLuint dl = glGenLists(1);
 				if (dl == 0) {
 					gLog("Failed to create display list for tile %d,%d\n", i, j);
 					continue;
@@ -344,7 +363,7 @@ void World::initLowresTerrain()
 			}
 		}
 	}
-	f.close();
+	//f.close();
 }
 
 GLuint gdetailtexcoords=0, galphatexcoords=0;

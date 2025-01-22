@@ -232,34 +232,65 @@ void Liquid::initGeometry(MPQFile &f)
 
 void Liquid::draw()
 {
-	glDisable(GL_CULL_FACE);
-	glDepthFunc(GL_LESS);
-	size_t texidx = (size_t)(gWorld->animtime / 60.0f) % textures.size();
-	glBindTexture(GL_TEXTURE_2D, textures[texidx]);
-
-	const float tcol = trans ? 0.9f : 1.0f;
-	if (trans) {
-		glEnable(GL_BLEND);
-		glDepthMask(GL_FALSE);
+	// First validate the this pointer - if the memory pattern shows 0xCD, 
+	// this is likely uninitialized memory
+	if (this == nullptr ||
+		reinterpret_cast<uintptr_t>(this) == 0xCDCDCDCD ||
+		reinterpret_cast<uintptr_t>(this) > 0xFFFFFFFF) {
+		return;
 	}
 
-	if (type==0) glColor4f(1,1,1,tcol);
-	else {
-		if (type==2) {
-			// dynamic color lookup! ^_^
-			col = gWorld->skies->colorSet[WATER_COLOR_LIGHT]; // TODO: add variable water color
+	// Now validate our member variables before accessing them
+	try {
+		if (textures.empty() || !dlist) {
+			return;
 		}
-		glColor4f(col.x, col.y, col.z, tcol);
-		glTexEnvi(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_ADD); // TODO: check if ARB_texture_env_add is supported? :(
+
+		glDisable(GL_CULL_FACE);
+		glDepthFunc(GL_LESS);
+
+		size_t texidx = 0;
+		if (gWorld) {
+			texidx = (size_t)(gWorld->animtime / 60.0f) % textures.size();
+		}
+
+		glBindTexture(GL_TEXTURE_2D, textures[texidx]);
+
+		const float tcol = trans ? 0.9f : 1.0f;
+		if (trans) {
+			glEnable(GL_BLEND);
+			glDepthMask(GL_FALSE);
+		}
+
+		if (type == 0) {
+			glColor4f(1, 1, 1, tcol);
+		}
+		else {
+			if (type == 2 && gWorld && gWorld->skies) {
+				col = gWorld->skies->colorSet[WATER_COLOR_LIGHT];
+			}
+			glColor4f(col.x, col.y, col.z, tcol);
+			glTexEnvi(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_ADD);
+		}
+
+		glCallList(dlist);
+
+		if (type != 0) {
+			glTexEnvi(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_MODULATE);
+		}
+		glDepthFunc(GL_LEQUAL);
+		glColor4f(1, 1, 1, 1);
+		if (trans) {
+			glDepthMask(GL_TRUE);
+			glDisable(GL_BLEND);
+		}
 	}
-    glCallList(dlist);
-	
-	if (type!=0) glTexEnvi(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_MODULATE);
-	glDepthFunc(GL_LEQUAL);
-	glColor4f(1,1,1,1);
-	if (trans) {
+	catch (...) {
+		// If anything goes wrong during drawing, restore GL state
+		glDepthFunc(GL_LEQUAL);
 		glDepthMask(GL_TRUE);
 		glDisable(GL_BLEND);
+		glColor4f(1, 1, 1, 1);
 	}
 }
 
@@ -272,11 +303,15 @@ void Liquid::initTextures(char *basename, int first, int last)
 	}
 }
 
-
 Liquid::~Liquid()
 {
-	for (size_t i=0; i<textures.size(); i++) {
+	// Early return if textures is empty or invalid
+	if (!textures.size()) {
+		return;
+	}
+
+	// Delete all textures
+	for (size_t i = 0; i < textures.size(); i++) {
 		video.textures.del(textures[i]);
 	}
 }
-

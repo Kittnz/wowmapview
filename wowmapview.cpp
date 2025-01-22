@@ -121,7 +121,7 @@ int main(int argc, char *argv[])
     int xres = 1920;
     int yres = 1200;
 
-    bool usePatch = true;
+    bool usePatch = false;
 
     const char *override_game_path = NULL;
     int maxFps = 60;
@@ -429,11 +429,31 @@ void fixnamen(char *name, size_t len)
 
 void fixname(std::string &name)
 {
-    for (size_t i=0; i<name.length(); i++) {
-        if (i>0 && name[i]>='A' && name[i]<='Z' && isalpha(name[i-1])) {
+    for (size_t i = 0; i < name.length(); i++)
+    {
+        size_t wmoPos = name.find("Wmo");
+        if (wmoPos != std::string::npos) {
+            name[wmoPos] = 'w';
+            name[wmoPos + 1] = 'm';
+            name[wmoPos + 2] = 'o';
+        }
+
+        if (i > 0 && name[i] >= 'A' && name[i] <= 'Z' && isalpha(name[i - 1]))
+        {
             name[i] |= 0x20;
-        } else if ((i==0 || !isalpha(name[i-1])) && name[i]>='a' && name[i]<='z') {
+        }
+        else if ((i == 0 || !isalpha(name[i - 1])) && name[i] >= 'a' && name[i] <= 'z')
+        {
             name[i] &= ~0x20;
+        }
+
+        size_t wmoPos2 = name.find(".Wmo");
+        if (wmoPos2 != std::string::npos)
+        {
+            name[wmoPos2] = '.';
+            name[wmoPos2 + 1] = 'w';
+            name[wmoPos2 + 2] = 'm';
+            name[wmoPos2 + 3] = 'o';
         }
     }
 }

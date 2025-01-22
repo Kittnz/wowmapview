@@ -76,7 +76,7 @@ MapTile::MapTile(int x0, int z0, char* filename): x(x0), z(z0), topnode(0,0,16)
 				delete[] buf;
 			}
 		}
-		else if (!strcmp(fourcc,"MWMO")) {
+		/*else if (!strcmp(fourcc, "MWMO")) {
 			// map objects
 			// MWID would be relative offsets for MWMO filenames
 			if (size) {
@@ -87,7 +87,35 @@ MapTile::MapTile(int x0, int z0, char* filename): x(x0), z(z0), topnode(0,0,16)
 					string path(p);
 					p+=strlen(p)+1;
 					fixname(path);
-					
+					// World\wmo\Azeroth\Buildings\Stormwind\Stormwind.wmo
+					gWorld->wmomanager.add(path);
+					wmos.push_back(path);
+				}
+				delete[] buf;
+			}
+		}*/
+		else if (!strcmp(fourcc, "MWMO")) {
+			// map objects
+			// MWID would be relative offsets for MWMO filenames
+			if (size) {
+				char* buf = new char[size];
+				f.read(buf, size);
+				char* p = buf;
+				while (p < buf + size) {
+					// First get the original path exactly as it appears in the MPQ
+					string path = string(p);
+					p += strlen(p) + 1;
+
+					// Convert to lowercase for consistent comparison
+					string lowerPath = path;
+					transform(lowerPath.begin(), lowerPath.end(), lowerPath.begin(), ::tolower);
+
+					// Log for debugging
+					gLog("Original MPQ path: %s\n", p);
+					gLog("Original converted path: %s\n", path.c_str());
+					gLog("Lowercase path: %s\n", lowerPath.c_str());
+
+					// Use the original case-sensitive path from the MPQ
 					gWorld->wmomanager.add(path);
 					wmos.push_back(path);
 				}
@@ -566,7 +594,7 @@ void MapChunk::initStrip(int holes)
 void MapChunk::destroy()
 {
 	// unload alpha maps
-	glDeleteTextures(nTextures-1, alphamaps);
+	glDeleteTextures(nTextures - 1, alphamaps);
 	// shadow maps, too
 	glDeleteTextures(1, &shadow);
 
@@ -576,7 +604,14 @@ void MapChunk::destroy()
 
 	if (hasholes) delete[] strip;
 
-	if (haswater) delete lq;
+	// Validate liquid pointer before deletion
+	if (haswater && lq &&
+		reinterpret_cast<uintptr_t>(lq) != 0xCDCDCDCD &&
+		reinterpret_cast<uintptr_t>(lq) <= 0xFFFFFFFF) {
+		delete lq;
+	}
+	lq = nullptr;
+	haswater = false;
 }
 
 void MapChunk::drawPass(int anim)
@@ -798,10 +833,18 @@ void MapChunk::drawWater()
 
 	*/
 
-	if (haswater) {
+	if (!haswater || !lq)
+		return;
+
+	try {
 		lq->draw();
 	}
-
+	catch (...) {
+		// Silently fail if something goes wrong with water rendering
+		// Could log error here if desired
+		haswater = false; // Prevent future attempts
+		lq = nullptr;
+	}
 }
 
 void MapNode::draw()
