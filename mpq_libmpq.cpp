@@ -16,7 +16,12 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
+#ifdef _WIN32
+#include <windows.h>
+#endif
+
 #include "mpq_libmpq.h"
+#include "wowmapview.h"
 #include <deque>
 #include <stdio.h>
 
@@ -118,36 +123,40 @@ MPQFile::MPQFile(const char* filename):
 
 size_t MPQFile::read(void* dest, size_t bytes)
 {
-    // Validate inputs and state
-    if (eof || !dest || !buffer || bytes == 0) {
+    if (eof || !dest || !buffer || bytes == 0 || size == 0) {
+        gLog("MPQFile::read - Invalid state: eof=%d dest=%p buffer=%p bytes=%zu size=%zu\n",
+            eof, dest, buffer, bytes, size);
         return 0;
     }
 
-    // Validate pointer is within bounds
+#ifdef _WIN32
+    if (IsBadReadPtr(buffer, size)) {
+        gLog("MPQFile::read - Invalid buffer pointer %p for size %zu\n", buffer, size);
+        eof = true;
+        return 0;
+    }
+    if (IsBadWritePtr(dest, bytes)) {
+        gLog("MPQFile::read - Invalid destination pointer %p for size %zu\n", dest, bytes);
+        return 0;
+    }
+#endif
+
     if (pointer >= size) {
         eof = true;
         return 0;
     }
 
-    // Calculate remaining bytes and validate read size
     size_t remaining = size - pointer;
-    size_t bytesToRead = std::min(bytes, remaining);
+    size_t bytesToRead = min(bytes, remaining);
 
-    // Bounds check the read operation
-    try {
-        memcpy(dest, &(buffer[pointer]), bytesToRead);
-        pointer += bytesToRead;
+    memcpy(dest, &buffer[pointer], bytesToRead);
+    pointer += bytesToRead;
 
-        if (pointer >= size) {
-            eof = true;
-        }
-
-        return bytesToRead;
-    }
-    catch (...) {
+    if (pointer >= size) {
         eof = true;
-        return 0;
     }
+
+    return bytesToRead;
 }
 
 void MPQFile::seek(int offset)

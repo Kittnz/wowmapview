@@ -106,18 +106,18 @@ MapTile::MapTile(int x0, int z0, char* filename): x(x0), z(z0), topnode(0,0,16)
 					string path = string(p);
 					p += strlen(p) + 1;
 
-					// Convert to lowercase for consistent comparison
-					string lowerPath = path;
-					transform(lowerPath.begin(), lowerPath.end(), lowerPath.begin(), ::tolower);
-
-					// Log for debugging
-					gLog("Original MPQ path: %s\n", p);
-					gLog("Original converted path: %s\n", path.c_str());
-					gLog("Lowercase path: %s\n", lowerPath.c_str());
-
-					// Use the original case-sensitive path from the MPQ
-					gWorld->wmomanager.add(path);
-					wmos.push_back(path);
+					// Test if file exists in MPQ
+					MPQFile test(path.c_str());
+					if (!test.isEof()) {
+						fixname(path);
+						gWorld->wmomanager.add(path);
+						wmos.push_back(path);
+						gLog("Adding WMO: %s\n", path.c_str());
+					}
+					else {
+						gLog("Skipping missing WMO: %s\n", path.c_str());
+					}
+					test.close();
 				}
 				delete[] buf;
 			}

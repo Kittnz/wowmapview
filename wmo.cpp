@@ -5,7 +5,7 @@
 
 using namespace std;
 
-WMO::WMO(std::string name): ManagedItem(name)
+WMO::WMO(std::string name) : ManagedItem(name)
 {
 	MPQFile f(name.c_str());
 	ok = !f.isEof();
@@ -14,22 +14,58 @@ WMO::WMO(std::string name): ManagedItem(name)
 		return;
 	}
 
+	if (!f.getBuffer() || f.getSize() < 8) {
+		gLog("Error: Invalid WMO file buffer for %s (buffer=%p size=%zu)\n",
+			name.c_str(), f.getBuffer(), f.getSize());
+		ok = false;
+		return;
+	}
+
 	gLog("Loading WMO %s\n", name.c_str());
 
 	char fourcc[5];
 	size_t size;
 	float ff[3];
-
-	char *ddnames;
-	char *groupnames;
-
+	char* ddnames = nullptr;
+	char* groupnames = nullptr;
 	skybox = 0;
-
-	char *texbuf=0;
+	char* texbuf = 0;
 
 	while (!f.isEof()) {
-		f.read(fourcc,4);
-		f.read(&size, 4);
+		// Read and validate chunk header
+		if (f.read(fourcc, 4) != 4) {
+			gLog("Error reading WMO chunk header\n");
+			ok = false;
+			break;
+		}
+
+		// Validate fourcc contains valid characters
+		bool validHeader = true;
+		for (int i = 0; i < 4; i++) {
+			if (!isprint(fourcc[i])) {
+				validHeader = false;
+				break;
+			}
+		}
+
+		if (!validHeader) {
+			gLog("Invalid WMO chunk header found in %s\n", name.c_str());
+			ok = false;
+			break;
+		}
+
+		if (f.read(&size, 4) != 4) {
+			gLog("Error reading WMO chunk size\n");
+			ok = false;
+			break;
+		}
+
+		// Validate chunk size
+		if (size > f.getSize() - f.getPos()) {
+			gLog("Invalid chunk size in WMO %s\n", name.c_str());
+			ok = false;
+			break;
+		}
 
 		flipcc(fourcc);
 		fourcc[4] = 0;
@@ -492,34 +528,56 @@ struct WMOGroupHeader {
 
 void WMOGroup::initDisplayList()
 {
-	Vec3D *vertices, *normals;
-	Vec2D *texcoords;
-	unsigned short *indices;
-	unsigned short *materials;
-	WMOBatch *batches;
-	int nBatches;
-
+	Vec3D* vertices = nullptr, * normals = nullptr;
+	Vec2D* texcoords = nullptr;
+	unsigned short* indices = nullptr;
+	unsigned short* materials = nullptr;
+	WMOBatch* batches = nullptr;
+	int nBatches = 0;
 	WMOGroupHeader gh;
-
-	short *useLights = 0;
+	short* useLights = 0;
 	int nLR = 0;
 
-	// open group file
 	char temp[256];
 	strcpy(temp, wmo->name.c_str());
-    temp[wmo->name.length()-4] = 0;
-	
+	temp[wmo->name.length() - 4] = 0;
+
 	char fname[256];
-	sprintf(fname,"%s_%03d.wmo",temp, num);
+	sprintf(fname, "%s_%03d.wmo", temp, num);
 
 	MPQFile gf(fname);
-    gf.seek(0x14);
+	if (gf.isEof()) {
+		gLog("Failed to open WMO group file %s\n", fname);
+		return;
+	}
 
-	// read header
-	gf.read(&gh, sizeof(WMOGroupHeader));
-	WMOFog &wf = wmo->fogs[gh.fogs[0]];
-	if (wf.r2 <= 0) fog = -1; // default outdoor fog..?
-	else fog = gh.fogs[0];
+	if (gf.getSize() < sizeof(WMOGroupHeader) + 0x14) {
+		gLog("WMO group file too small: %s\n", fname);
+		return;
+	}
+
+	gf.seek(0x14);
+
+	// Read and validate header
+	if (gf.read(&gh, sizeof(WMOGroupHeader)) != sizeof(WMOGroupHeader)) {
+		gLog("Failed to read WMO group header from %s\n", fname);
+		return;
+	}
+
+	// Validate fog index
+	if (gh.fogs[0] >= wmo->fogs.size()) {
+		gLog("Invalid fog index in WMO group %s: %d\n", fname, gh.fogs[0]);
+		fog = -1;
+		return;
+	}
+
+	WMOFog& wf = wmo->fogs[gh.fogs[0]];
+	if (wf.r2 <= 0) {
+		fog = -1; // default outdoor fog
+	}
+	else {
+		fog = gh.fogs[0];
+	}
 
 	b1 = Vec3D(gh.box1[0], gh.box1[2], -gh.box1[1]);
 	b2 = Vec3D(gh.box2[0], gh.box2[2], -gh.box2[1]);

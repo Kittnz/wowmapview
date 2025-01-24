@@ -96,21 +96,49 @@ void Liquid::initFromWMO(MPQFile &f, WMOMaterial &mat, bool indoor)
 }
 
 
-void Liquid::initGeometry(MPQFile &f)
-{
-	// assume: f is at the appropriate starting position
+void Liquid::initGeometry(MPQFile& f) {
+	LiquidVertex* map = (LiquidVertex*)f.getPointer();
 
-	LiquidVertex *map = (LiquidVertex*) f.getPointer();
-	unsigned char *flags = (unsigned char*) (f.getPointer() + (xtiles+1)*(ytiles+1)*sizeof(LiquidVertex));
+	// Validate pointer and check for obvious corruption
+	if (!map || reinterpret_cast<uintptr_t>(map) & 0x3) {
+		gLog("Error: Invalid or misaligned liquid vertex map pointer: %p\n", map);
+		return;
+	}
 
-	// generate vertices
-	Vec3D *verts = new Vec3D[(xtiles+1)*(ytiles+1)];
-	for (int j=0; j<ytiles+1; j++) {
-		for (int i=0; i<xtiles+1; i++) {
-			size_t p = j*(xtiles+1)+i;
+	size_t flagsOffset = (xtiles + 1) * (ytiles + 1) * sizeof(LiquidVertex);
+	if (flagsOffset != 648) { // Expected size based on 8x8 tiles
+		gLog("Error: Invalid flags offset %zu (expected 648)\n", flagsOffset);
+		return;
+	}
+
+	// Validate tiles dimensions
+	if (xtiles != 8 || ytiles != 8) {
+		gLog("Error: Invalid tile dimensions: %dx%d\n", xtiles, ytiles);
+		return;
+	}
+
+	unsigned char* flags = (unsigned char*)(f.getPointer() + flagsOffset);
+	if (!flags) {
+		gLog("Error: Invalid flags pointer\n");
+		return;
+	}
+
+	Vec3D* verts = new Vec3D[(xtiles + 1) * (ytiles + 1)];
+
+	for (int j = 0; j < ytiles + 1; j++) {
+		for (int i = 0; i < xtiles + 1; i++) {
+			size_t p = j * (xtiles + 1) + i;
+
+			// Check array bounds
+			if (p >= (xtiles + 1) * (ytiles + 1)) {
+				gLog("Error: Vertex index out of bounds\n");
+				delete[] verts;
+				return;
+			}
+
 			float h = map[p].h;
 			if (h > 100000) h = pos.y;
-            verts[p] = Vec3D(pos.x + tilesize * i, h, pos.z + ydir * tilesize * j);
+			verts[p] = Vec3D(pos.x + tilesize * i, h, pos.z + ydir * tilesize * j);
 		}
 	}
 
