@@ -26,6 +26,9 @@ float randfloat(float lower, float upper);
 int randint(int lower, int upper);
 void fixname(std::string &name);
 void fixnamen(char *name, size_t len);
+void fixname2(char* name, size_t len);
+const char* GetPlainName(const char* FileName);
+char* GetPlainName(char* FileName);
 
 bool StartsWith (std::string const &fullString, std::string const &starting);
 bool EndsWith (std::string const &fullString, std::string const &ending);

@@ -280,7 +280,7 @@ void Menu::display(float t, float dt)
 			glColor4f(1,1,1,1);
 			f32->shprint(300,0,"World of Warcraft map viewer");
 			//f16->print(380,40,"reverse engineered and written by ufoz");
-			f16->shprint(380,40,"http://wowmapview.sourceforge.net");
+			//f16->shprint(380,40,"http://wowmapview.sourceforge.net");
 
 			f16->shprint(video.xres - 20 - f16->textwidth(APP_VERSION), 10, APP_VERSION);
 			

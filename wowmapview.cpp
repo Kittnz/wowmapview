@@ -416,14 +416,30 @@ int randint(int lower, int upper)
     return lower + (int)((upper+1-lower)*frand());
 }
 
-void fixnamen(char *name, size_t len)
+void fixnamen(char* name, size_t len)
 {
-    for (size_t i=0; i<len; i++) {
-        if (i>0 && name[i]>='A' && name[i]<='Z' && isalpha(name[i-1])) {
+    for (size_t i = 0; i < len - 3; i++)
+    {
+        if (i > 0 && name[i] >= 'A' && name[i] <= 'Z' && isalpha(name[i - 1]))
+        {
             name[i] |= 0x20;
-        } else if ((i==0 || !isalpha(name[i-1])) && name[i]>='a' && name[i]<='z') {
+        }
+        else if ((i == 0 || !isalpha(name[i - 1])) && name[i] >= 'a' && name[i] <= 'z')
+        {
             name[i] &= ~0x20;
         }
+    }
+    //extension in lowercase
+    for (size_t i = len - 3; i < len; i++)
+        name[i] |= 0x20;
+}
+
+void fixname2(char* name, size_t len)
+{
+    for (size_t i = 0; i < len - 3; i++)
+    {
+        if (name[i] == ' ')
+            name[i] = '_';
     }
 }
 
@@ -456,6 +472,24 @@ void fixname(std::string &name)
             name[wmoPos2 + 3] = 'o';
         }
     }
+}
+
+const char* GetPlainName(const char* FileName)
+{
+    const char* szTemp;
+
+    if ((szTemp = strrchr(FileName, '\\')) != NULL)
+        FileName = szTemp + 1;
+    return FileName;
+}
+
+char* GetPlainName(char* FileName)
+{
+    char* szTemp;
+
+    if ((szTemp = strrchr(FileName, '\\')) != NULL)
+        FileName = szTemp + 1;
+    return FileName;
 }
 
 int file_exists(const char *path)

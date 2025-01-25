@@ -8,10 +8,15 @@ int globalTime = 0;
 Model::Model(std::string name, bool forceAnim) : ManagedItem(name), forceAnim(forceAnim)
 {
 	// replace .MDX with .M2
-    char tempname[256];
-    strcpy(tempname,name.c_str());
-    tempname[name.length()-2] = '2';
-    tempname[name.length()-1] = 0;
+	char tempname[256];
+	strcpy(tempname, name.c_str());
+	size_t len = name.length();
+
+	if ((strstr(tempname, ".mdx") != nullptr || strstr(tempname, ".MDX") != nullptr || strstr(tempname, ".Mdx") != nullptr)) {
+		tempname[len - 3] = 'M';
+		tempname[len - 2] = '2';
+		tempname[len - 1] = 0;
+	}
 
 	MPQFile f(tempname);
 	ok = !f.isEof();

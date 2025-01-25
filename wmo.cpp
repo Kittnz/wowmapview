@@ -21,6 +21,11 @@ WMO::WMO(std::string name) : ManagedItem(name)
 		return;
 	}
 
+
+	if (strstr(name.c_str(), "Stormwind.wmo") != nullptr) {
+		gLog("Stormwind WMO\n");
+	}
+
 	gLog("Loading WMO %s\n", name.c_str());
 
 	char fourcc[5];
@@ -32,9 +37,16 @@ WMO::WMO(std::string name) : ManagedItem(name)
 	char* texbuf = 0;
 
 	while (!f.isEof()) {
-		// Read and validate chunk header
+		// Read and validate chunk header 
 		if (f.read(fourcc, 4) != 4) {
 			gLog("Error reading WMO chunk header\n");
+			ok = false;
+			break;
+		}
+
+		// Read size immediately after header
+		if (f.read(&size, 4) != 4) {
+			gLog("Error reading WMO chunk size\n");
 			ok = false;
 			break;
 		}
@@ -48,17 +60,24 @@ WMO::WMO(std::string name) : ManagedItem(name)
 			}
 		}
 
-		if (!validHeader) {
-			gLog("Invalid WMO chunk header found in %s\n", name.c_str());
+		/*if (!validHeader) {
+			// Invalid header - make it "MOHD" default WMO header
+			memcpy(fourcc, "MOHD", 4);
+			gLog("Fixed invalid WMO chunk header in %s\n", name.c_str());
+		}*/
+
+		// Validate chunk size
+		if (size > f.getSize() - f.getPos()) {
+			gLog("Invalid chunk size in WMO %s\n", name.c_str());
 			ok = false;
 			break;
 		}
 
-		if (f.read(&size, 4) != 4) {
-			gLog("Error reading WMO chunk size\n");
+		/*if (!validHeader) {
+			gLog("Invalid WMO chunk header found in %s\n", name.c_str());
 			ok = false;
 			break;
-		}
+		}*/
 
 		// Validate chunk size
 		if (size > f.getSize() - f.getPos()) {

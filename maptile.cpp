@@ -94,14 +94,15 @@ MapTile::MapTile(int x0, int z0, char* filename): x(x0), z(z0), topnode(0,0,16)
 				delete[] buf;
 			}
 		}*/
-		else if (!strcmp(fourcc, "MWMO")) {
+		/*else if (!strcmp(fourcc, "MWMO")) {
 			// map objects
 			// MWID would be relative offsets for MWMO filenames
 			if (size) {
 				char* buf = new char[size];
 				f.read(buf, size);
 				char* p = buf;
-				while (p < buf + size) {
+				while (p < buf + size)
+				{
 					// First get the original path exactly as it appears in the MPQ
 					string path = string(p);
 					p += strlen(p) + 1;
@@ -119,6 +120,40 @@ MapTile::MapTile(int x0, int z0, char* filename): x(x0), z(z0), topnode(0,0,16)
 					}
 					test.close();
 				}
+				delete[] buf;
+			}
+		}*/
+		else if (!strcmp(fourcc, "MWMO")) {
+			if (size) {
+				char* buf = new char[size];
+				f.read(buf, size);
+				char* p = buf;
+
+				while (p < buf + size) {
+					std::string path(p);
+
+					// Get plain name and fix it
+					char* s = GetPlainName(p);
+					fixnamen(s, strlen(s));
+					fixname2(s, strlen(s));
+
+					// Advance pointer past current string
+					p += strlen(p) + 1;
+
+					// Test if WMO file exists in MPQ
+					MPQFile test(path.c_str());
+					if (!test.isEof()) {
+						fixname(path);
+						gWorld->wmomanager.add(path);
+						wmos.push_back(path);
+						gLog("Adding WMO: %s\n", path.c_str());
+					}
+					else {
+						gLog("Skipping missing WMO: %s\n", path.c_str());
+					}
+					test.close();
+				}
+
 				delete[] buf;
 			}
 		}
